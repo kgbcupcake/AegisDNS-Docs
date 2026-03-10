@@ -1,0 +1,562 @@
+This file is a merged representation of a subset of the codebase, containing specifically included files, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Only files matching these patterns are included: src/AegisDNS.Licensing/**/*.cs
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+src/
+  AegisDNS.Licensing/
+    AesGcmTokenStore.cs
+    HardwareIdentity.cs
+    LicenseManager.cs
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="src/AegisDNS.Licensing/AesGcmTokenStore.cs">
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
+
+namespace AegisDNS.Licensing;
+
+/// <summary>
+/// Cross-platform AES-256-GCM token storage.
+/// Key is derived from HardwareIdentity.Get() so tokens are HWID-bound
+/// and will fail to decrypt on any other machine.
+///
+/// Disk format: [12-byte nonce][16-byte GCM tag][ciphertext]
+/// No headers, no JSON wrapper — raw binary for minimum attack surface.
+/// </summary>
+public static class AesGcmTokenStore
+{
+    private const int NonceSize = 12;   // 96-bit nonce — GCM standard
+    private const int TagSize = 16;   // 128-bit authentication tag
+
+    public static string GetTokenPath(string appName = "AegisDNS")
+    {
+        // Linux → XDG Base Dir spec
+        string xdgData = Environment.GetEnvironmentVariable("XDG_DATA_HOME")
+                      ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                                      ".local", "share");
+        return Path.Combine(xdgData, appName, "activation.token");
+    }
+
+    private static byte[] DeriveKey()
+    {
+        byte[] ikm = Encoding.UTF8.GetBytes(HardwareIdentity.Get());
+        byte[] salt = Encoding.UTF8.GetBytes("AegisDNS|TokenKey|v1");
+        return HKDF.DeriveKey(HashAlgorithmName.SHA256, ikm, 32, salt);
+    }
+
+    public static void Encrypt(string plaintext, string path)
+    {
+        byte[] key = DeriveKey();
+        byte[] nonce = new byte[NonceSize];
+        byte[] tag = new byte[TagSize];
+        byte[] input = Encoding.UTF8.GetBytes(plaintext);
+        byte[] ciphertext = new byte[input.Length];
+
+        RandomNumberGenerator.Fill(nonce);
+
+        using var aes = new AesGcm(key, TagSize);
+        aes.Encrypt(nonce, input, ciphertext, tag);
+
+        byte[] blob = new byte[NonceSize + TagSize + ciphertext.Length];
+        Buffer.BlockCopy(nonce, 0, blob, 0, NonceSize);
+        Buffer.BlockCopy(tag, 0, blob, NonceSize, TagSize);
+        Buffer.BlockCopy(ciphertext, 0, blob, NonceSize + TagSize, ciphertext.Length);
+
+        string? dir = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            Directory.CreateDirectory(dir);
+        File.WriteAllBytes(path, blob);
+    }
+
+    public static string? Decrypt(string path)
+    {
+        Debug.WriteLine($"[AesGcmTokenStore.Decrypt] Path='{path}'");
+        if (!File.Exists(path))
+        {
+            Debug.WriteLine("[AesGcmTokenStore.Decrypt] File missing.");
+            return null;
+        }
+
+        try
+        {
+            byte[] blob = File.ReadAllBytes(path);
+            Debug.WriteLine($"[AesGcmTokenStore.Decrypt] Blob length={blob.Length} bytes.");
+            if (blob.Length < NonceSize + TagSize + 1)
+                throw new CryptographicException("Token file too short — corrupted.");
+
+            byte[] nonce = blob[..NonceSize];
+            byte[] tag = blob[NonceSize..(NonceSize + TagSize)];
+            byte[] ciphertext = blob[(NonceSize + TagSize)..];
+            byte[] plaintext = new byte[ciphertext.Length];
+
+            using var aes = new AesGcm(DeriveKey(), TagSize);
+            aes.Decrypt(nonce, ciphertext, tag, plaintext);
+            string result = Encoding.UTF8.GetString(plaintext);
+            Debug.WriteLine($"[AesGcmTokenStore.Decrypt] Success. Plaintext length={result.Length}.");
+            return result;
+        }
+        catch (AuthenticationTagMismatchException ex)
+        {
+            Debug.WriteLine($"[AesGcmTokenStore.Decrypt] AuthenticationTagMismatchException: {ex.Message}. Deleting token.");
+            TryDelete(path);
+            return null;
+        }
+        catch (CryptographicException ex)
+        {
+            Debug.WriteLine($"[AesGcmTokenStore.Decrypt] CryptographicException: {ex.Message}. Deleting token.");
+            TryDelete(path);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[AesGcmTokenStore.Decrypt] Unexpected exception ({ex.GetType().Name}): {ex.Message}");
+            return null;
+        }
+    }
+
+    public static bool Exists(string path) => File.Exists(path);
+    public static void TryDelete(string path) { try { if (File.Exists(path)) File.Delete(path); } catch { } }
+}
+</file>
+
+<file path="src/AegisDNS.Licensing/HardwareIdentity.cs">
+using System;
+using System.IO;
+using System.Security.Cryptography;
+using System.Text;
+
+namespace AegisDNS.Licensing;
+
+public static class HardwareIdentity
+{
+    private static readonly Lazy<string> Cached = new(Compute);
+
+    /// <summary>
+    /// Returns a stable, machine-scoped identity that is identical for
+    /// root/non-root callers on the same Linux host.
+    /// </summary>
+    public static string Get() => Cached.Value;
+
+    private static string Compute()
+    {
+        string rawId = GetLinuxHwid();
+
+        using var sha256 = SHA256.Create();
+        var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(rawId));
+        return BitConverter.ToString(hash).Replace("-", "").ToUpperInvariant();
+    }
+
+    private static string GetLinuxHwid()
+    {
+        // Use machine-id only. DMI UUID fallback was removed because it can be
+        // permission-dependent across root/non-root contexts.
+        string? machineId = TryReadMachineId("/etc/machine-id");
+        if (!string.IsNullOrEmpty(machineId))
+            return machineId;
+
+        machineId = TryReadMachineId("/var/lib/dbus/machine-id");
+        if (!string.IsNullOrEmpty(machineId))
+            return machineId;
+
+        throw new PlatformNotSupportedException("Linux hardware identity could not be determined from standard paths (/etc/machine-id, /var/lib/dbus/machine-id).");
+    }
+
+    private static string? TryReadMachineId(string path)
+    {
+        if (!File.Exists(path))
+            return null;
+
+        string value = File.ReadAllText(path).Trim().ToLowerInvariant();
+        return string.IsNullOrEmpty(value) ? null : value;
+    }
+
+}
+</file>
+
+<file path="src/AegisDNS.Licensing/LicenseManager.cs">
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+
+namespace AegisDNS.Licensing;
+
+public static class LicenseManager
+{
+    internal static string BaseDir { get; set; } = Path.GetDirectoryName(AesGcmTokenStore.GetTokenPath("AegisDNS"))!;
+    internal static string LicensePath => Path.Combine(BaseDir, "license.dat");
+    internal static string TokenPath => AesGcmTokenStore.GetTokenPath("AegisDNS");
+    internal static string TrialPath => Path.Combine(BaseDir, "trial.info");
+
+    public const int TrialDays = 14;
+    public const int GraceDays = 7;
+
+    internal static string PublicKeyPem = @"-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAiCeAIL7ZuanNfeJ5OFfR
+VwquEJfIBYRd8ugkM2/w/+Cfgcgkog68A2ApvlXTfykMa+9M2Im3kVnASryAN4wd
+mxR9VkXPCB7Ci1poUuY+lI+NDYGArX5GxEScZ4sEqAzdaLLHTAZRS6taQvqCO3HV
+uUyG8Y+KlTwpChMDCubqCeD0o9tmoQYQBsQXNDJNYakYRkWt7YX2v2yBb6vVOz2N
+TMwJrTx2W44XkkAU6qhLZpzgkeRntxoQ4xrKqkICLfqJ1DWbwDvAvKpDRtdK+w3g
+I2fkQ+hs8KtuyWSsUPx0LGgkAcS1T3nV1srSDD0sjQjQFZeCyWv1E9pFfJdpS1MF
+/wIDAQAB
+-----END PUBLIC KEY-----";
+
+    public enum LicenseTier { Community, Basic, Pro, AegisPrime, Enterprise, Founder, Developer }
+
+    public static bool IsDevMode => CurrentTier == LicenseTier.Developer;
+
+    public class LicensePayload
+    {
+        public string Product { get; set; } = "";
+        public string Edition { get; set; } = "Consumer";
+        public string Type { get; set; } = "Perpetual";
+        public DateTime IssueDate { get; set; }
+        public DateTime? ExpiryDate { get; set; }
+        public Dictionary<string, JsonElement>? Metadata { get; set; }
+    }
+
+    public static bool ValidateFormat(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return false;
+        var parts = key.Split('.');
+        return parts.Length == 2 && IsBase64(parts[0]) && IsBase64(parts[1]);
+    }
+
+    private static bool IsBase64(string base64)
+    {
+        try { Convert.FromBase64String(base64); return true; } catch { return false; }
+    }
+
+    public static bool IsLicenseValid()
+    {
+        try
+        {
+            string? tokenData = AesGcmTokenStore.Decrypt(TokenPath);
+            if (tokenData == null) return false;
+
+            var parts = tokenData.Split('|');
+            if (parts.Length < 4) return false;
+
+            string rawLicense = parts[0];
+            string savedHwid = parts[1];
+
+            // 1. RSA Signature Re-verification
+            var licenseParts = rawLicense.Split('.');
+            if (licenseParts.Length != 2) return false;
+
+            byte[] payloadBytes = Convert.FromBase64String(licenseParts[0]);
+            byte[] signature = Convert.FromBase64String(licenseParts[1]);
+
+            if (!VerifySignature(payloadBytes, signature)) return false;
+
+            // 2. HWID Check (Fixed Time) - Bypassed for Developer tier
+            var json = Encoding.UTF8.GetString(payloadBytes);
+            LicensePayload? payload;
+            try { payload = JsonSerializer.Deserialize<LicensePayload>(json); }
+            catch (JsonException) { return false; }
+
+            if (payload == null || !SafeStringEquals(payload.Product, "AegisDNS")) return false;
+
+            // 4. Revocation Check (Local)
+            if (payload.Metadata != null && payload.Metadata.TryGetValue("Id", out var licenseIdElement))
+            {
+                var licenseId = licenseIdElement.GetString();
+                if (licenseId != null && IsKeyRevoked(licenseId)) return false;
+            }
+
+            if (payload.Edition != "Developer")
+            {
+                string currentHwid = HardwareIdentity.Get();
+                if (!SafeStringEquals(savedHwid, currentHwid)) return false;
+            }
+
+            // 3. Expiry Check
+            if (payload.ExpiryDate.HasValue && DateTime.UtcNow > payload.ExpiryDate.Value.AddDays(GraceDays))
+            {
+                return false;
+            }
+
+            return true;
+        }
+        catch { return false; }
+    }
+
+    private static bool IsKeyRevoked(string licenseId)
+    {
+        try
+        {
+            string configDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config", "aegisdns");
+            string revokedPath = Path.Combine(configDir, "revoked.json");
+
+            if (!File.Exists(revokedPath)) return false;
+
+            string json = File.ReadAllText(revokedPath);
+            string[]? revokedIds;
+            try
+            {
+                revokedIds = JsonSerializer.Deserialize<string[]>(json);
+            }
+            catch (JsonException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LicenseManager] Failed to deserialize: {ex.Message}");
+                return false;
+            }
+            return revokedIds != null && revokedIds.Contains(licenseId);
+        }
+        catch { return false; }
+    }
+
+    private static bool SafeStringEquals(string? a, string? b)
+    {
+        byte[] aBytes = Encoding.UTF8.GetBytes(a ?? "");
+        byte[] bBytes = Encoding.UTF8.GetBytes(b ?? "");
+        int maxLen = Math.Max(aBytes.Length, bBytes.Length);
+        byte[] aPadded = new byte[maxLen];
+        byte[] bPadded = new byte[maxLen];
+        Array.Copy(aBytes, aPadded, aBytes.Length);
+        Array.Copy(bBytes, bPadded, bBytes.Length);
+        return CryptographicOperations.FixedTimeEquals(aPadded, bPadded);
+    }
+
+    public static string? GetRawLicenseFromToken()
+    {
+        try
+        {
+            string? tokenData = AesGcmTokenStore.Decrypt(TokenPath);
+            if (tokenData == null) return null;
+
+            var parts = tokenData.Split('|');
+            return parts.Length > 0 ? parts[0] : null;
+        }
+        catch { return null; }
+    }
+
+    public static bool EnsureActivated(string? rawLicense = null)
+    {
+        if (string.IsNullOrEmpty(rawLicense))
+            return IsLicenseValid();
+
+        try
+        {
+            var parts = rawLicense.Split('.');
+            if (parts.Length != 2) return false;
+
+            byte[] payloadBytes = Convert.FromBase64String(parts[0]);
+            byte[] signature = Convert.FromBase64String(parts[1]);
+
+            if (!VerifySignature(payloadBytes, signature)) return false;
+
+            var json = Encoding.UTF8.GetString(payloadBytes);
+            LicensePayload? payload;
+            try { payload = JsonSerializer.Deserialize<LicensePayload>(json); }
+            catch (JsonException) { return false; }
+            if (payload == null || !SafeStringEquals(payload.Product, "AegisDNS")) return false;
+
+            string hwid = HardwareIdentity.Get();
+            string expiry = payload.ExpiryDate?.ToString("O") ?? "Never";
+            string tokenData = $"{rawLicense}|{hwid}|{payload.Edition}|{expiry}";
+
+            AesGcmTokenStore.Encrypt(tokenData, TokenPath);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    private static bool VerifySignature(byte[] data, byte[] signature)
+    {
+        try
+        {
+            using var rsa = RSA.Create();
+            rsa.ImportFromPem(PublicKeyPem);
+            return rsa.VerifyData(data, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        }
+        catch { return false; }
+    }
+
+    public static LicenseTier CurrentTier
+    {
+        get
+        {
+            Debug.WriteLine($"[LicenseManager.CurrentTier] Resolving tier from TokenPath='{TokenPath}'");
+            string? tokenData = AesGcmTokenStore.Decrypt(TokenPath);
+            if (tokenData != null)
+            {
+                try
+                {
+                    var parts = tokenData.Split('|');
+                    Debug.WriteLine($"[LicenseManager.CurrentTier] Token decrypted. parts.Length={parts.Length}");
+                    if (parts.Length >= 4)
+                    {
+                        Debug.WriteLine($"[LicenseManager.CurrentTier] Parsed edition='{parts[2]}', expiryRaw='{parts[3]}'");
+                        var tier = parts[2] switch
+                        {
+                            "Developer" => LicenseTier.Developer,
+                            "Founder" => LicenseTier.Founder,
+                            "Enterprise" => LicenseTier.Enterprise,
+                            "AegisPrime" => LicenseTier.AegisPrime,
+                            "Pro" => LicenseTier.Pro,
+                            "Basic" => LicenseTier.Basic,
+                            _ => LicenseTier.Community
+                        };
+                        Debug.WriteLine($"[LicenseManager.CurrentTier] Mapped tier={tier}");
+
+                        if (DateTime.TryParse(parts[3], out DateTime expiry))
+                        {
+                            Debug.WriteLine($"[LicenseManager.CurrentTier] Expiry parsed={expiry:O}, now={DateTime.UtcNow:O}");
+                            if (DateTime.UtcNow > expiry.AddDays(GraceDays))
+                            {
+                                Debug.WriteLine("[LicenseManager.CurrentTier] Expired beyond grace, returning Community.");
+                                return LicenseTier.Community;
+                            }
+                        }
+                        else
+                        {
+                            Debug.WriteLine("[LicenseManager.CurrentTier] Expiry parse failed, using mapped tier.");
+                        }
+
+                        Debug.WriteLine($"[LicenseManager.CurrentTier] Returning tier={tier} from token.");
+                        return tier;
+                    }
+                    Debug.WriteLine("[LicenseManager.CurrentTier] Token format invalid (<4 parts).");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[LicenseManager.CurrentTier] Exception while parsing token ({ex.GetType().Name}): {ex.Message}");
+                }
+            }
+            else
+            {
+                Debug.WriteLine("[LicenseManager.CurrentTier] Token decrypt returned null.");
+            }
+
+            if (IsTrialActive())
+            {
+                Debug.WriteLine("[LicenseManager.CurrentTier] Trial active. Returning Pro.");
+                return LicenseTier.Pro;
+            }
+
+            Debug.WriteLine("[LicenseManager.CurrentTier] Trial inactive. Returning Community.");
+            return LicenseTier.Community;
+        }
+    }
+
+    private class TrialData
+    {
+        public DateTime InstallationDate { get; set; }
+        public DateTime LastCheckDate { get; set; }
+    }
+
+    public static bool IsTrialActive()
+    {
+        try
+        {
+            if (!AesGcmTokenStore.Exists(TrialPath))
+            {
+                InitializeTrial();
+                return true;
+            }
+
+            string? json = AesGcmTokenStore.Decrypt(TrialPath);
+            if (json == null) return false;
+
+            TrialData? data;
+            try { data = JsonSerializer.Deserialize<TrialData>(json); }
+            catch (JsonException) { return false; }
+            if (data == null) return false;
+
+            if (DateTime.UtcNow < data.LastCheckDate) return false;
+
+            data.LastCheckDate = DateTime.UtcNow;
+            SaveTrial(data);
+
+            return (DateTime.UtcNow - data.InstallationDate).TotalDays <= TrialDays;
+        }
+        catch { return false; }
+    }
+
+    private static void InitializeTrial()
+    {
+        var data = new TrialData { InstallationDate = DateTime.UtcNow, LastCheckDate = DateTime.UtcNow };
+        SaveTrial(data);
+    }
+
+    private static void SaveTrial(TrialData data)
+    {
+        string json = JsonSerializer.Serialize(data);
+        AesGcmTokenStore.Encrypt(json, TrialPath);
+    }
+
+    public static bool IsTrialExpired => !IsTrialActive() && (DateTime.UtcNow - GetTrialStartDate()).TotalDays > TrialDays;
+
+    private static DateTime GetTrialStartDate()
+    {
+        try
+        {
+            string? json = AesGcmTokenStore.Decrypt(TrialPath);
+            if (json == null) return DateTime.MaxValue;
+            TrialData? data = null;
+            try { data = JsonSerializer.Deserialize<TrialData>(json); }
+            catch (JsonException) { }
+            return data?.InstallationDate ?? DateTime.MaxValue;
+        }
+        catch { return DateTime.MaxValue; }
+    }
+
+    public static void Deactivate()
+    {
+        AesGcmTokenStore.TryDelete(TokenPath);
+    }
+}
+</file>
+
+</files>

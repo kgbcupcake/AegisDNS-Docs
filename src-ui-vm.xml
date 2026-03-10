@@ -1,0 +1,2238 @@
+This file is a merged representation of a subset of the codebase, containing specifically included files, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Only files matching these patterns are included: src/AegisDNS.UI/ViewModels/*.cs, src/AegisDNS.UI/Converters/*.cs
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+src/
+  AegisDNS.UI/
+    Converters/
+      LogLevelToBrushConverter.cs
+    ViewModels/
+      AppearanceViewModel.cs
+      BetaAccessViewModel.cs
+      DashboardViewModel.cs
+      DotSettingsViewModel.cs
+      ExtensionApiViewModel.cs
+      HttpsProxySettingsViewModel.cs
+      MainViewModel.cs
+      ProcessRulesViewModel.cs
+      RouterModeViewModel.cs
+      SchedulerViewModel.cs
+      SettingsViewModel.cs
+      StreamingSettingsViewModel.cs
+      ViewModelBase.cs
+      XdpSettingsViewModel.cs
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="src/AegisDNS.UI/ViewModels/ViewModelBase.cs">
+using ReactiveUI;
+
+namespace AegisDNS.ViewModels;
+
+public class ViewModelBase : ReactiveObject
+{
+}
+</file>
+
+<file path="src/AegisDNS.UI/Converters/LogLevelToBrushConverter.cs">
+using System;
+using System.Globalization;
+using Avalonia.Data.Converters;
+using Avalonia.Media;
+
+namespace AegisDNS;
+
+public class LogLevelToBrushConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        return value?.ToString() switch
+        {
+            "Critical" or "Error" => Brushes.Red,
+            "Warning" => Brushes.Orange,
+            "Information" => Brushes.CornflowerBlue,
+            "Debug" or "Trace" => Brushes.Gray,
+            _ => Brushes.White
+        };
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotImplementedException();
+}
+</file>
+
+<file path="src/AegisDNS.UI/ViewModels/DotSettingsViewModel.cs">
+using System.Reactive;
+
+using AegisDNS.Core;
+using AegisDNS.Core.Utilities;
+
+using ReactiveUI;
+
+namespace AegisDNS.ViewModels;
+
+public class DotSettingsViewModel : ReactiveObject
+{
+    private int _upstreamModeIndex = (int)DnsConfigManager.Settings.UpstreamMode;
+    public int UpstreamModeIndex
+    {
+        get => _upstreamModeIndex;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _upstreamModeIndex, value);
+            this.RaisePropertyChanged(nameof(IsUdpMode));
+            this.RaisePropertyChanged(nameof(IsDoHMode));
+            this.RaisePropertyChanged(nameof(IsDoTMode));
+        }
+    }
+
+    public bool IsUdpMode
+    {
+        get => _upstreamModeIndex == 0;
+        set { if (value) UpstreamModeIndex = 0; }
+    }
+
+    public bool IsDoHMode
+    {
+        get => _upstreamModeIndex == 1;
+        set { if (value) UpstreamModeIndex = 1; }
+    }
+
+    public bool IsDoTMode
+    {
+        get => _upstreamModeIndex == 2;
+        set { if (value) UpstreamModeIndex = 2; }
+    }
+
+    private string _dotUpstream = DnsConfigManager.Settings.DoTUpstream;
+    public string DoTUpstream
+    {
+        get => _dotUpstream;
+        set => this.RaiseAndSetIfChanged(ref _dotUpstream, value);
+    }
+
+    private bool _enableLatencyMonitor = DnsConfigManager.Settings.EnableLatencyMonitor;
+    public bool EnableLatencyMonitor
+    {
+        get => _enableLatencyMonitor;
+        set => this.RaiseAndSetIfChanged(ref _enableLatencyMonitor, value);
+    }
+
+    private int _latencyAlertThreshold = DnsConfigManager.Settings.LatencyAlertThresholdMs;
+    public int LatencyAlertThresholdMs
+    {
+        get => _latencyAlertThreshold;
+        set => this.RaiseAndSetIfChanged(ref _latencyAlertThreshold, value);
+    }
+
+    public ReactiveCommand<Unit, Unit> Save { get; }
+
+    public DotSettingsViewModel()
+    {
+        Save = ReactiveCommand.Create(ExecuteSave);
+    }
+
+    private void ExecuteSave()
+    {
+        DnsConfigManager.Settings.UpstreamMode = (UpstreamMode)UpstreamModeIndex;
+        DnsConfigManager.Settings.DoTUpstream = DoTUpstream;
+        DnsConfigManager.Settings.EnableLatencyMonitor = EnableLatencyMonitor;
+        DnsConfigManager.Settings.LatencyAlertThresholdMs = LatencyAlertThresholdMs;
+        DnsConfigManager.Save();
+    }
+}
+</file>
+
+<file path="src/AegisDNS.UI/ViewModels/ExtensionApiViewModel.cs">
+using System.Reactive;
+
+using AegisDNS.Core;
+using AegisDNS.Core.Utilities;
+
+using ReactiveUI;
+
+namespace AegisDNS.ViewModels;
+
+public class ExtensionApiViewModel : ReactiveObject
+{
+    private bool _isEnabled = RouterConfigManager.Settings.EnableExtensionApi;
+    public bool IsEnabled
+    {
+        get => _isEnabled;
+        set => this.RaiseAndSetIfChanged(ref _isEnabled, value);
+    }
+
+    private int _port = RouterConfigManager.Settings.ExtensionApiPort;
+    public int Port
+    {
+        get => _port;
+        set => this.RaiseAndSetIfChanged(ref _port, value);
+    }
+
+    public string ApiUrl => $"http://127.0.0.1:{Port}/status";
+
+    public ReactiveCommand<Unit, Unit> Save { get; }
+
+    public ExtensionApiViewModel()
+    {
+        Save = ReactiveCommand.Create(ExecuteSave);
+    }
+
+    private void ExecuteSave()
+    {
+        RouterConfigManager.Settings.EnableExtensionApi = IsEnabled;
+        RouterConfigManager.Settings.ExtensionApiPort = Port;
+        RouterConfigManager.Save();
+    }
+}
+</file>
+
+<file path="src/AegisDNS.UI/ViewModels/HttpsProxySettingsViewModel.cs">
+using System;
+using System.Collections.ObjectModel;
+using System.Reactive;
+using System.Threading.Tasks;
+
+using AegisDNS.Core;
+using AegisDNS.Core.Security;
+using AegisDNS.Licensing;
+
+using ReactiveUI;
+
+namespace AegisDNS.ViewModels;
+
+/// <summary>
+/// ViewModel for the HTTPS Proxy Ad Blocker settings window.
+/// Phase 18 — HTTPS Proxy Ad Blocker.
+/// </summary>
+public class HttpsProxySettingsViewModel : ViewModelBase
+{
+    private string _caStatus = "Checking...";
+    private string _newBypassDomain = "";
+
+    public HttpsProxySettingsViewModel()
+    {
+        ProxyBypassDomains = new ObservableCollection<string>(HttpsProxyConfigManager.Settings.ProxyBypassDomains);
+
+        InstallCaCert = ReactiveCommand.CreateFromTask(async () =>
+        {
+            CaStatus = "Installing...";
+            bool success = await CertificateManager.InstallCaCertAsync();
+            RefreshCaStatus();
+            return success;
+        });
+
+        AddBypassDomain = ReactiveCommand.Create(() =>
+        {
+            if (!string.IsNullOrWhiteSpace(NewBypassDomain) && !ProxyBypassDomains.Contains(NewBypassDomain))
+            {
+                ProxyBypassDomains.Add(NewBypassDomain);
+                HttpsProxyConfigManager.Settings.ProxyBypassDomains.Add(NewBypassDomain);
+                NewBypassDomain = "";
+                HttpsProxyConfigManager.Save();
+            }
+        });
+
+        RemoveBypassDomain = ReactiveCommand.Create<string>(domain =>
+        {
+            ProxyBypassDomains.Remove(domain);
+            HttpsProxyConfigManager.Settings.ProxyBypassDomains.Remove(domain);
+            HttpsProxyConfigManager.Save();
+        });
+
+        Save = ReactiveCommand.Create(() =>
+        {
+            HttpsProxyConfigManager.Save();
+            return Unit.Default;
+        });
+
+        RefreshCaStatus();
+    }
+
+    public void RefreshCaStatus()
+    {
+        CaStatus = CertificateManager.IsCaInstalled() ? "Installed ✓" : "Not installed — Click to install";
+    }
+
+    public string CaStatus
+    {
+        get => _caStatus;
+        set => this.RaiseAndSetIfChanged(ref _caStatus, value);
+    }
+
+    public string NewBypassDomain
+    {
+        get => _newBypassDomain;
+        set => this.RaiseAndSetIfChanged(ref _newBypassDomain, value);
+    }
+
+    public ObservableCollection<string> ProxyBypassDomains { get; }
+
+    public ReactiveCommand<Unit, bool> InstallCaCert { get; }
+    public ReactiveCommand<Unit, Unit> AddBypassDomain { get; }
+    public ReactiveCommand<string, Unit> RemoveBypassDomain { get; }
+    public ReactiveCommand<Unit, Unit> Save { get; }
+
+    public bool IsProOrHigher =>
+#if DEBUG
+        true;
+#else
+        LicenseManager.CurrentTier >= LicenseManager.LicenseTier.Pro;
+#endif
+
+    public bool EnableHttpsProxy
+    {
+        get => HttpsProxyConfigManager.Settings.EnableHttpsProxy;
+        set
+        {
+            HttpsProxyConfigManager.Settings.EnableHttpsProxy = value;
+            this.RaisePropertyChanged();
+
+            // If enabling for the first time and CA not installed, we should probably warn or auto-trigger status check
+            if (value) RefreshCaStatus();
+        }
+    }
+
+    public bool ProxyBlockYouTubeAds
+    {
+        get => HttpsProxyConfigManager.Settings.ProxyBlockYouTubeAds;
+        set { HttpsProxyConfigManager.Settings.ProxyBlockYouTubeAds = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool ProxyBlockSpotifyAds
+    {
+        get => HttpsProxyConfigManager.Settings.ProxyBlockSpotifyAds;
+        set { HttpsProxyConfigManager.Settings.ProxyBlockSpotifyAds = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool ProxyBlockPrimeVideoAds
+    {
+        get => HttpsProxyConfigManager.Settings.ProxyBlockPrimeVideoAds;
+        set { HttpsProxyConfigManager.Settings.ProxyBlockPrimeVideoAds = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool ProxyBlockDisneyPlusAds
+    {
+        get => HttpsProxyConfigManager.Settings.ProxyBlockDisneyPlusAds;
+        set { HttpsProxyConfigManager.Settings.ProxyBlockDisneyPlusAds = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool ProxyBlockGenericAds
+    {
+        get => HttpsProxyConfigManager.Settings.ProxyBlockGenericAds;
+        set { HttpsProxyConfigManager.Settings.ProxyBlockGenericAds = value; this.RaisePropertyChanged(); }
+    }
+}
+</file>
+
+<file path="src/AegisDNS.UI/ViewModels/ProcessRulesViewModel.cs">
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.IO;
+using System.Reactive;
+
+using AegisDNS.Core.ProcessTracking;
+
+using ReactiveUI;
+
+namespace AegisDNS.ViewModels;
+
+public class ProcessRulesViewModel : ReactiveObject
+{
+    private readonly ProcessRuleEngine _engine = new();
+
+    public ObservableCollection<ProcessDnsRule> Rules { get; } = [];
+
+    public ReactiveCommand<Unit, Unit> AddRule { get; }
+    public ReactiveCommand<ProcessDnsRule, Unit> RemoveRule { get; }
+    public ReactiveCommand<Unit, Unit> Save { get; }
+
+    // New rule fields
+    private string _newProcessName = "";
+    public string NewProcessName
+    {
+        get => _newProcessName;
+        set => this.RaiseAndSetIfChanged(ref _newProcessName, value);
+    }
+
+    // Running processes (loaded on open) for the process picker
+    public ObservableCollection<string> RunningProcesses { get; } = [];
+
+    public ProcessRulesViewModel()
+    {
+        // Load existing rules
+        foreach (var rule in _engine.GetAll())
+            Rules.Add(rule);
+
+        AddRule = ReactiveCommand.Create(ExecuteAddRule);
+        RemoveRule = ReactiveCommand.Create<ProcessDnsRule>(ExecuteRemoveRule);
+        Save = ReactiveCommand.Create(ExecuteSave);
+
+        RefreshRunningProcesses();
+    }
+
+    private void ExecuteAddRule()
+    {
+        if (string.IsNullOrWhiteSpace(NewProcessName)) return;
+        Rules.Add(new ProcessDnsRule { ProcessName = NewProcessName.Trim() });
+        NewProcessName = "";
+    }
+
+    private void ExecuteRemoveRule(ProcessDnsRule rule)
+    {
+        Rules.Remove(rule);
+    }
+
+    private void ExecuteSave()
+    {
+        _engine.Save(Rules);
+    }
+
+    /// <summary>Enumerates /proc to list currently running process names.</summary>
+    public void RefreshRunningProcesses()
+    {
+        RunningProcesses.Clear();
+        try
+        {
+            var seen = new HashSet<string>();
+            foreach (var pidDir in Directory.EnumerateDirectories("/proc"))
+            {
+                if (!int.TryParse(Path.GetFileName(pidDir), out _)) continue;
+                string commPath = Path.Combine(pidDir, "comm");
+                if (!File.Exists(commPath)) continue;
+                string name = File.ReadAllText(commPath).Trim();
+                if (!string.IsNullOrWhiteSpace(name) && seen.Add(name))
+                    RunningProcesses.Add(name);
+            }
+        }
+        catch { }
+    }
+}
+</file>
+
+<file path="src/AegisDNS.UI/ViewModels/RouterModeViewModel.cs">
+using System;
+using System.Collections.ObjectModel;
+using System.Reactive;
+using System.Reactive.Linq;
+
+using AegisDNS.Core;
+using AegisDNS.Core.RouterMode;
+
+using ReactiveUI;
+
+namespace AegisDNS.ViewModels;
+
+public class RouterModeViewModel : ReactiveObject
+{
+    private string _bindAddress = RouterConfigManager.Settings.RouterModeBindAddress;
+    public string BindAddress
+    {
+        get => _bindAddress;
+        set => this.RaiseAndSetIfChanged(ref _bindAddress, value);
+    }
+
+    private int _port = RouterConfigManager.Settings.RouterModePort;
+    public int Port
+    {
+        get => _port;
+        set => this.RaiseAndSetIfChanged(ref _port, value);
+    }
+
+    private bool _isEnabled = RouterConfigManager.Settings.EnableRouterMode;
+    public bool IsEnabled
+    {
+        get => _isEnabled;
+        set => this.RaiseAndSetIfChanged(ref _isEnabled, value);
+    }
+
+    public ObservableCollection<ConnectedDevice> ConnectedDevices { get; } = [];
+
+    public ReactiveCommand<Unit, Unit> Enable { get; }
+    public ReactiveCommand<Unit, Unit> Disable { get; }
+    public ReactiveCommand<Unit, Unit> Refresh { get; }
+
+    public RouterModeViewModel()
+    {
+        Enable = ReactiveCommand.Create(ExecuteEnable);
+        Disable = ReactiveCommand.Create(ExecuteDisable);
+        Refresh = ReactiveCommand.Create(ExecuteRefresh);
+
+        // Auto-refresh connected devices every 5 seconds
+        Observable
+            .Interval(TimeSpan.FromSeconds(5))
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(_ => ExecuteRefresh());
+
+        ExecuteRefresh();
+    }
+
+    private void ExecuteEnable()
+    {
+        RouterConfigManager.Settings.EnableRouterMode = true;
+        RouterConfigManager.Settings.RouterModeBindAddress = BindAddress;
+        RouterConfigManager.Settings.RouterModePort = Port;
+        RouterConfigManager.Save();
+        IsEnabled = true;
+    }
+
+    private void ExecuteDisable()
+    {
+        RouterConfigManager.Settings.EnableRouterMode = false;
+        RouterConfigManager.Save();
+        IsEnabled = false;
+    }
+
+    private void ExecuteRefresh()
+    {
+        ConnectedDevices.Clear();
+        foreach (var device in ConnectedDeviceTracker.Instance.GetDevices())
+            ConnectedDevices.Add(device);
+    }
+}
+</file>
+
+<file path="src/AegisDNS.UI/ViewModels/SchedulerViewModel.cs">
+using System;
+using System.Collections.ObjectModel;
+using System.Reactive;
+
+using AegisDNS.Core.Scheduling;
+
+using ReactiveUI;
+
+namespace AegisDNS.ViewModels;
+
+public class SchedulerViewModel : ReactiveObject
+{
+    private readonly ScheduleEngine _engine = new();
+
+    public ObservableCollection<BlockSchedule> Schedules { get; } = [];
+
+    public ReactiveCommand<Unit, Unit> AddSchedule { get; }
+    public ReactiveCommand<BlockSchedule, Unit> RemoveSchedule { get; }
+    public ReactiveCommand<Unit, Unit> Save { get; }
+    public ReactiveCommand<Unit, Unit> PauseThirtyMinutes { get; }
+
+    private bool _isPaused;
+    public bool IsPaused
+    {
+        get => _isPaused;
+        private set => this.RaiseAndSetIfChanged(ref _isPaused, value);
+    }
+
+    private string _pausedUntilDisplay = "";
+    public string PausedUntilDisplay
+    {
+        get => _pausedUntilDisplay;
+        private set => this.RaiseAndSetIfChanged(ref _pausedUntilDisplay, value);
+    }
+
+    public SchedulerViewModel()
+    {
+        foreach (var schedule in _engine.GetAll())
+            Schedules.Add(schedule);
+
+        AddSchedule = ReactiveCommand.Create(ExecuteAddSchedule);
+        RemoveSchedule = ReactiveCommand.Create<BlockSchedule>(ExecuteRemoveSchedule);
+        Save = ReactiveCommand.Create(ExecuteSave);
+        PauseThirtyMinutes = ReactiveCommand.Create(ExecutePauseThirtyMinutes);
+
+        RefreshPauseStatus();
+    }
+
+    private void ExecuteAddSchedule()
+    {
+        Schedules.Add(new BlockSchedule
+        {
+            Name = "New Schedule",
+            StartTime = TimeSpan.FromHours(9),
+            EndTime = TimeSpan.FromHours(17),
+            Enabled = true
+        });
+    }
+
+    private void ExecuteRemoveSchedule(BlockSchedule schedule)
+    {
+        Schedules.Remove(schedule);
+    }
+
+    private void ExecuteSave()
+    {
+        _engine.Save(Schedules);
+    }
+
+    private void ExecutePauseThirtyMinutes()
+    {
+        _engine.PauseUntil(DateTime.UtcNow.AddMinutes(30));
+        RefreshPauseStatus();
+    }
+
+    public void RefreshPauseStatus()
+    {
+        IsPaused = _engine.IsPaused;
+        PausedUntilDisplay = IsPaused
+            ? $"Paused until {_engine.PausedUntil:HH:mm}"
+            : "";
+    }
+}
+</file>
+
+<file path="src/AegisDNS.UI/ViewModels/StreamingSettingsViewModel.cs">
+using System.Reactive;
+
+using AegisDNS.Core;
+using AegisDNS.Licensing;
+
+using ReactiveUI;
+
+namespace AegisDNS.ViewModels;
+
+/// <summary>
+/// ViewModel for the Streaming Ad Blocker settings window.
+/// Phase 17 — DNS Streaming Ad Blocker.
+/// </summary>
+public class StreamingSettingsViewModel : ViewModelBase
+{
+    public StreamingSettingsViewModel()
+    {
+        Save = ReactiveCommand.Create(() =>
+        {
+            StreamingConfigManager.Save();
+            return Unit.Default;
+        });
+    }
+
+    /// <summary>True when the current license tier is Pro or higher.</summary>
+    public bool IsProOrHigher =>
+#if DEBUG
+        true;
+#else
+        LicenseManager.CurrentTier >= LicenseManager.LicenseTier.Pro;
+#endif
+
+    public ReactiveCommand<Unit, Unit> Save { get; }
+
+    // ── Master toggle ──────────────────────────────────────────────────────────
+
+    public bool EnableStreamingAdBlock
+    {
+        get => StreamingConfigManager.Settings.EnableStreamingAdBlock;
+        set { StreamingConfigManager.Settings.EnableStreamingAdBlock = value; this.RaisePropertyChanged(); }
+    }
+
+    // ── Per-platform toggles ───────────────────────────────────────────────────
+
+    public bool BlockSpotifyAds
+    {
+        get => StreamingConfigManager.Settings.BlockSpotifyAds;
+        set { StreamingConfigManager.Settings.BlockSpotifyAds = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool BlockTwitchAds
+    {
+        get => StreamingConfigManager.Settings.BlockTwitchAds;
+        set { StreamingConfigManager.Settings.BlockTwitchAds = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool BlockHuluAds
+    {
+        get => StreamingConfigManager.Settings.BlockHuluAds;
+        set { StreamingConfigManager.Settings.BlockHuluAds = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool BlockPeacockAds
+    {
+        get => StreamingConfigManager.Settings.BlockPeacockAds;
+        set { StreamingConfigManager.Settings.BlockPeacockAds = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool BlockParamountAds
+    {
+        get => StreamingConfigManager.Settings.BlockParamountAds;
+        set { StreamingConfigManager.Settings.BlockParamountAds = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool BlockYouTubeTracking
+    {
+        get => StreamingConfigManager.Settings.BlockYouTubeTracking;
+        set { StreamingConfigManager.Settings.BlockYouTubeTracking = value; this.RaisePropertyChanged(); }
+    }
+}
+</file>
+
+<file path="src/AegisDNS.UI/ViewModels/XdpSettingsViewModel.cs">
+using System;
+using System.Reactive;
+using System.Runtime.Versioning;
+using System.Threading.Tasks;
+
+using AegisDNS.Core;
+
+using ReactiveUI;
+
+namespace AegisDNS.ViewModels;
+
+[SupportedOSPlatform("linux")]
+public class XdpSettingsViewModel : ViewModelBase
+{
+    private string _resolvedInterface = "detecting...";
+    private string _kernelModeLabel = "NOT LOADED";
+    private long _dropCount;
+
+    public XdpSettingsViewModel()
+    {
+        SaveSettings = ReactiveCommand.CreateFromTask(async () =>
+        {
+            await Task.Run(() => XdpConfigManager.Save());
+            return Unit.Default;
+        });
+
+        DetachXdp = ReactiveCommand.CreateFromTask(async () =>
+        {
+            var result = await IpcSystem.SendCommandAsync(new IpcSystem.IpcPacket("XDP_DETACH"));
+            if (result != null)
+                KernelModeLabel = "NOT LOADED";
+        });
+
+        ReconfigureXdp = ReactiveCommand.CreateFromTask(async () =>
+        {
+            var result = await IpcSystem.SendCommandAsync(new IpcSystem.IpcPacket("XDP_RECONFIGURE"));
+            if (result != null)
+                KernelModeLabel = "RECONFIGURING...";
+        });
+
+        // Resolve interface display on load
+        Task.Run(() =>
+        {
+            string iface = XdpConfigManager.Settings.XdpInterface;
+            if (string.Equals(iface, "auto", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    string[] lines = System.IO.File.ReadAllLines("/proc/net/route");
+                    for (int i = 1; i < lines.Length; i++)
+                    {
+                        string[] fields = lines[i].Split('\t', StringSplitOptions.RemoveEmptyEntries);
+                        if (fields.Length >= 2 && fields[1] == "00000000")
+                        {
+                            ResolvedInterface = $"{fields[0]} (auto-detected)";
+                            return;
+                        }
+                    }
+                }
+                catch { /* Linux only — expected to fail on Windows */ }
+                ResolvedInterface = "eth0 (auto-detected)";
+            }
+            else
+            {
+                ResolvedInterface = iface;
+            }
+        });
+    }
+
+    // ── Commands ─────────────────────────────────────────────────────────────
+    public ReactiveCommand<Unit, Unit> SaveSettings { get; }
+    public ReactiveCommand<Unit, Unit> DetachXdp { get; }
+    public ReactiveCommand<Unit, Unit> ReconfigureXdp { get; }
+
+    // ── XDP Mode ────────────────────────────────────────────────────────────
+    public int XdpMode
+    {
+        get => XdpConfigManager.Settings.XdpMode;
+        set { XdpConfigManager.Settings.XdpMode = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool IsOff
+    {
+        get => XdpMode == 0;
+        set { if (value) XdpMode = 0; this.RaisePropertyChanged(); this.RaisePropertyChanged(nameof(IsMonitor)); this.RaisePropertyChanged(nameof(IsBlock)); }
+    }
+
+    public bool IsMonitor
+    {
+        get => XdpMode == 1;
+        set { if (value) XdpMode = 1; this.RaisePropertyChanged(); this.RaisePropertyChanged(nameof(IsOff)); this.RaisePropertyChanged(nameof(IsBlock)); }
+    }
+
+    public bool IsBlock
+    {
+        get => XdpMode == 2;
+        set { if (value) XdpMode = 2; this.RaisePropertyChanged(); this.RaisePropertyChanged(nameof(IsOff)); this.RaisePropertyChanged(nameof(IsMonitor)); }
+    }
+
+    // ── Interface ───────────────────────────────────────────────────────────
+    public string XdpInterface
+    {
+        get => XdpConfigManager.Settings.XdpInterface;
+        set { XdpConfigManager.Settings.XdpInterface = value; this.RaisePropertyChanged(); }
+    }
+
+    public string ResolvedInterface
+    {
+        get => _resolvedInterface;
+        set => this.RaiseAndSetIfChanged(ref _resolvedInterface, value);
+    }
+
+    // ── Protection Rules ────────────────────────────────────────────────────
+    public bool XdpRfc1918Protection
+    {
+        get => XdpConfigManager.Settings.XdpRfc1918Protection;
+        set { XdpConfigManager.Settings.XdpRfc1918Protection = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool XdpAlertOnDrop
+    {
+        get => XdpConfigManager.Settings.XdpAlertOnDrop;
+        set { XdpConfigManager.Settings.XdpAlertOnDrop = value; this.RaisePropertyChanged(); }
+    }
+
+    // ── Live Stats ──────────────────────────────────────────────────────────
+    public string KernelModeLabel
+    {
+        get => _kernelModeLabel;
+        set => this.RaiseAndSetIfChanged(ref _kernelModeLabel, value);
+    }
+
+    public long DropCount
+    {
+        get => _dropCount;
+        set => this.RaiseAndSetIfChanged(ref _dropCount, value);
+    }
+
+    public void RefreshMetrics()
+    {
+        DropCount = MetricsManager.Current.XdpDroppedPackets;
+    }
+}
+</file>
+
+<file path="src/AegisDNS.UI/ViewModels/AppearanceViewModel.cs">
+using System;
+using System.IO;
+using System.Reactive;
+using System.Text.Json;
+using System.Threading.Tasks;
+
+using AegisDNS.Core;
+using AegisDNS.Licensing;
+
+using ReactiveUI;
+
+namespace AegisDNS.ViewModels;
+
+// UI ViewModel: logger injection deferred — Avalonia ViewModels are not DI-constructed; Debug.WriteLine retained.
+public class AppearanceViewModel : ViewModelBase
+{
+    public AppearanceViewModel(Func<Task<string?>>? getExportPath = null, Func<Task<string?>>? getImportPath = null)
+    {
+        var isProOrAbove = this.WhenAnyValue(x => x.IsPro);
+
+        SaveCommand = ReactiveCommand.CreateFromTask(async () =>
+        {
+            await Task.Run(() => ConfigManager.Save());
+            return Unit.Default;
+        });
+
+        ResetToDefaultCommand = ReactiveCommand.Create(() =>
+        {
+            GlowIntensity = 0.8;
+            GlowRadius = 12.0;
+            GlowColor = "#00FFFF";
+            BackgroundEffect = "None";
+            CrtModeEnabled = false;
+            WindowBackdrop = "Solid";
+            BackgroundOpacity = 1.0;
+            AccentColorPrimary = "#00FFFF";
+            AccentColorSecondary = "#0080FF";
+            LogFontFamily = "Consolas";
+            StrictMonospaceLog = true;
+            AudioPack = "Muted";
+            ThreatAlertSound = false;
+            ActiveThemeName = "Default";
+        });
+
+        ExportThemeCommand = ReactiveCommand.CreateFromTask(async () =>
+        {
+            if (getExportPath == null) return;
+            var path = await getExportPath();
+            if (!string.IsNullOrEmpty(path))
+            {
+                var json = SerializeTheme();
+                await File.WriteAllTextAsync(path, json);
+            }
+        });
+
+        ImportThemeCommand = ReactiveCommand.CreateFromTask(async () =>
+        {
+            if (getImportPath == null) return;
+            var path = await getImportPath();
+            if (!string.IsNullOrEmpty(path) && File.Exists(path))
+            {
+                var json = await File.ReadAllTextAsync(path);
+                ApplyTheme(json);
+            }
+        });
+    }
+
+    // --- Tier Gating ---
+
+    public bool IsPro
+    {
+        get
+        {
+#if DEBUG
+            return true;
+#else
+#pragma warning disable CA1416
+            return false;
+#pragma warning restore CA1416
+#endif
+        }
+    }
+
+    // --- Commands ---
+
+    public ReactiveCommand<Unit, Unit> SaveCommand { get; }
+    public ReactiveCommand<Unit, Unit> ResetToDefaultCommand { get; }
+    public ReactiveCommand<Unit, Unit> ExportThemeCommand { get; }
+    public ReactiveCommand<Unit, Unit> ImportThemeCommand { get; }
+
+    public event EventHandler<string>? ImportFailed;
+
+    // --- Glow ---
+
+    public double GlowIntensity
+    {
+        get => ConfigManager.Settings.GlowIntensity;
+        set
+        {
+            ConfigManager.Settings.GlowIntensity = Math.Clamp(value, 0.0, 1.0);
+            this.RaisePropertyChanged();
+        }
+    }
+
+    public double GlowRadius
+    {
+        get => ConfigManager.Settings.GlowRadius;
+        set
+        {
+            ConfigManager.Settings.GlowRadius = Math.Clamp(value, 4.0, 30.0);
+            this.RaisePropertyChanged();
+        }
+    }
+
+    public string GlowColor
+    {
+        get => ConfigManager.Settings.GlowColor;
+        set { ConfigManager.Settings.GlowColor = value; this.RaisePropertyChanged(); }
+    }
+
+    // --- Background Effects ---
+
+    public string BackgroundEffect
+    {
+        get => ConfigManager.Settings.BackgroundEffect;
+        set { ConfigManager.Settings.BackgroundEffect = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool CrtModeEnabled
+    {
+        get => ConfigManager.Settings.CrtModeEnabled;
+        set { ConfigManager.Settings.CrtModeEnabled = value; this.RaisePropertyChanged(); }
+    }
+
+    // --- Window & Transparency ---
+
+    public string WindowBackdrop
+    {
+        get => ConfigManager.Settings.WindowBackdrop;
+        set { ConfigManager.Settings.WindowBackdrop = value; this.RaisePropertyChanged(); }
+    }
+
+    public double BackgroundOpacity
+    {
+        get => ConfigManager.Settings.BackgroundOpacity;
+        set
+        {
+            ConfigManager.Settings.BackgroundOpacity = Math.Clamp(value, 0.4, 1.0);
+            this.RaisePropertyChanged();
+        }
+    }
+
+    public string AccentColorPrimary
+    {
+        get => ConfigManager.Settings.AccentColorPrimary;
+        set { ConfigManager.Settings.AccentColorPrimary = value; this.RaisePropertyChanged(); }
+    }
+
+    public string AccentColorSecondary
+    {
+        get => ConfigManager.Settings.AccentColorSecondary;
+        set { ConfigManager.Settings.AccentColorSecondary = value; this.RaisePropertyChanged(); }
+    }
+
+    // --- Typography ---
+
+    public string LogFontFamily
+    {
+        get => ConfigManager.Settings.LogFontFamily;
+        set { ConfigManager.Settings.LogFontFamily = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool StrictMonospaceLog
+    {
+        get => ConfigManager.Settings.StrictMonospaceLog;
+        set { ConfigManager.Settings.StrictMonospaceLog = value; this.RaisePropertyChanged(); }
+    }
+
+    // --- Audio ---
+
+    public string AudioPack
+    {
+        get => ConfigManager.Settings.AudioPack;
+        set
+        {
+            ConfigManager.Settings.AudioPack = value;
+            this.RaisePropertyChanged();
+            // Trigger 0.5s preview audio when pack changes (unless Muted)
+            if (value != "Muted") AegisDNS.UI.Audio.AudioFeedbackManager.PlayActionSuccess();
+        }
+    }
+
+    public bool ThreatAlertSound
+    {
+        get => ConfigManager.Settings.ThreatAlertSound;
+        set { ConfigManager.Settings.ThreatAlertSound = value; this.RaisePropertyChanged(); }
+    }
+
+    // --- Theme Profiles ---
+
+    public string ActiveThemeName
+    {
+        get => ConfigManager.Settings.ActiveThemeName;
+        set { ConfigManager.Settings.ActiveThemeName = value; this.RaisePropertyChanged(); }
+    }
+
+    // --- Theme Export/Import Logic ---
+
+    public string SerializeTheme()
+    {
+        var theme = new ThemeProfile
+        {
+            Name = ActiveThemeName,
+            GlowIntensity = GlowIntensity,
+            GlowRadius = GlowRadius,
+            GlowColor = GlowColor,
+            BackgroundEffect = BackgroundEffect,
+            CrtModeEnabled = CrtModeEnabled,
+            WindowBackdrop = WindowBackdrop,
+            BackgroundOpacity = BackgroundOpacity,
+            AccentColorPrimary = AccentColorPrimary,
+            AccentColorSecondary = AccentColorSecondary,
+            LogFontFamily = LogFontFamily,
+            StrictMonospaceLog = StrictMonospaceLog,
+            AudioPack = AudioPack,
+            ThreatAlertSound = ThreatAlertSound
+        };
+
+        return JsonSerializer.Serialize(theme, new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    public bool ApplyTheme(string json)
+    {
+        try
+        {
+            ThemeProfile? theme;
+            try
+            {
+                theme = JsonSerializer.Deserialize<ThemeProfile>(json);
+            }
+            catch (JsonException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[AppearanceViewModel] ApplyTheme JSON parse failed: {ex.Message}");
+                ImportFailed?.Invoke(this, "Failed to parse theme profile. " + ex.Message);
+                return false;
+            }
+            if (theme == null) return false;
+
+            ActiveThemeName = theme.Name ?? "Imported";
+            GlowIntensity = theme.GlowIntensity;
+            GlowRadius = theme.GlowRadius;
+            GlowColor = theme.GlowColor ?? "#00FFFF";
+            BackgroundEffect = theme.BackgroundEffect ?? "None";
+            CrtModeEnabled = theme.CrtModeEnabled;
+            WindowBackdrop = theme.WindowBackdrop ?? "Solid";
+            BackgroundOpacity = theme.BackgroundOpacity;
+            AccentColorPrimary = theme.AccentColorPrimary ?? "#00FFFF";
+            AccentColorSecondary = theme.AccentColorSecondary ?? "#0080FF";
+            LogFontFamily = theme.LogFontFamily ?? "Consolas";
+            StrictMonospaceLog = theme.StrictMonospaceLog;
+            AudioPack = theme.AudioPack ?? "Muted";
+            ThreatAlertSound = theme.ThreatAlertSound;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            ImportFailed?.Invoke(this, "Failed to parse theme profile. " + ex.Message);
+            return false;
+        }
+    }
+}
+
+public class ThemeProfile
+{
+    public string? Name { get; set; }
+    public double GlowIntensity { get; set; }
+    public double GlowRadius { get; set; }
+    public string? GlowColor { get; set; }
+    public string? BackgroundEffect { get; set; }
+    public bool CrtModeEnabled { get; set; }
+    public string? WindowBackdrop { get; set; }
+    public double BackgroundOpacity { get; set; }
+    public string? AccentColorPrimary { get; set; }
+    public string? AccentColorSecondary { get; set; }
+    public string? LogFontFamily { get; set; }
+    public bool StrictMonospaceLog { get; set; }
+    public string? AudioPack { get; set; }
+    public bool ThreatAlertSound { get; set; }
+}
+</file>
+
+<file path="src/AegisDNS.UI/ViewModels/BetaAccessViewModel.cs">
+using AegisDNS.Licensing;
+
+using ReactiveUI;
+
+namespace AegisDNS.ViewModels;
+
+public class BetaAccessViewModel : ViewModelBase
+{
+    private string _machineId = "";
+    public string MachineId
+    {
+        get => _machineId;
+        set => this.RaiseAndSetIfChanged(ref _machineId, value);
+    }
+
+    private bool _isVisible;
+    public bool IsVisible
+    {
+        get => _isVisible;
+        set => this.RaiseAndSetIfChanged(ref _isVisible, value);
+    }
+
+    private string _copyFeedbackText = "";
+    public string CopyFeedbackText
+    {
+        get => _copyFeedbackText;
+        set => this.RaiseAndSetIfChanged(ref _copyFeedbackText, value);
+    }
+
+    public BetaAccessViewModel()
+    {
+        RefreshStatus();
+    }
+
+    public void RefreshStatus()
+    {
+        // Try to get hardware ID, but don't blow up if it fails
+        try
+        {
+            MachineId = HardwareIdentity.Get();
+        }
+        catch
+        {
+            MachineId = "UNKNOWN-HARDWARE-ID";
+        }
+
+        // Panel is only visible if NO valid license exists (i.e. trial/community state)
+        IsVisible = !LicenseManager.IsLicenseValid();
+    }
+}
+</file>
+
+<file path="src/AegisDNS.UI/ViewModels/DashboardViewModel.cs">
+using System;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Reactive.Linq;
+
+using AegisDNS.Core;
+using AegisDNS.Core.Ai;
+using AegisDNS.Core.Monitoring;
+using AegisDNS.Core.Utilities;
+using AegisDNS.Licensing;
+
+using ReactiveUI;
+
+namespace AegisDNS.ViewModels;
+
+/// <summary>
+/// ViewModel for the Dashboard view.
+/// Observes MainViewModel's IPC-received data and exposes
+/// aggregate statistics and supplementary dashboard state.
+/// </summary>
+public class DashboardViewModel : ReactiveObject
+{
+    private readonly MainViewModel _mainVm;
+
+    private string _activeBlocklistUrl = "";
+    public string ActiveBlocklistUrl
+    {
+        get => _activeBlocklistUrl;
+        set => this.RaiseAndSetIfChanged(ref _activeBlocklistUrl, value);
+    }
+
+    private string _blockedRatio = "—";
+    public string BlockedRatio
+    {
+        get => _blockedRatio;
+        set => this.RaiseAndSetIfChanged(ref _blockedRatio, value);
+    }
+
+    private string _licenseTier = "";
+    public string LicenseTier
+    {
+        get => _licenseTier;
+        set => this.RaiseAndSetIfChanged(ref _licenseTier, value);
+    }
+
+    private string _aiProviderLabel = "Off";
+    public string AiProviderLabel
+    {
+        get => _aiProviderLabel;
+        set => this.RaiseAndSetIfChanged(ref _aiProviderLabel, value);
+    }
+
+    private string _aiLearnedBlocklistCount = "0 AI-learned blocks";
+    public string AiLearnedBlocklistCount
+    {
+        get => _aiLearnedBlocklistCount;
+        set => this.RaiseAndSetIfChanged(ref _aiLearnedBlocklistCount, value);
+    }
+
+    private string _lastAiDetection = "None";
+    public string LastAiDetection
+    {
+        get => _lastAiDetection;
+        set => this.RaiseAndSetIfChanged(ref _lastAiDetection, value);
+    }
+
+    private string _aiConfidenceSummary = "0 High, 0 Critical this session";
+    public string AiConfidenceSummary
+    {
+        get => _aiConfidenceSummary;
+        set => this.RaiseAndSetIfChanged(ref _aiConfidenceSummary, value);
+    }
+
+    private string _metricsTotal = "0";
+    public string MetricsTotal
+    {
+        get => _metricsTotal;
+        set => this.RaiseAndSetIfChanged(ref _metricsTotal, value);
+    }
+
+    private string _metricsBlocked = "0";
+    public string MetricsBlocked
+    {
+        get => _metricsBlocked;
+        set => this.RaiseAndSetIfChanged(ref _metricsBlocked, value);
+    }
+
+    public ObservableCollection<string> TopBlocked { get; } = new();
+    public ObservableCollection<string> TopAllowed { get; } = new();
+
+    private string _xdpStatus = "Off";
+    public string XdpStatus
+    {
+        get => _xdpStatus;
+        set => this.RaiseAndSetIfChanged(ref _xdpStatus, value);
+    }
+
+    private string _xdpDropCount = "0";
+    public string XdpDropCount
+    {
+        get => _xdpDropCount;
+        set => this.RaiseAndSetIfChanged(ref _xdpDropCount, value);
+    }
+
+    // Phase 11 — Latency Monitor
+    private int _upstreamLatencyMs = -1;
+    public int UpstreamLatencyMs
+    {
+        get => _upstreamLatencyMs;
+        set => this.RaiseAndSetIfChanged(ref _upstreamLatencyMs, value);
+    }
+
+    private string _upstreamLatencyDisplay = "—";
+    public string UpstreamLatencyDisplay
+    {
+        get => _upstreamLatencyDisplay;
+        set => this.RaiseAndSetIfChanged(ref _upstreamLatencyDisplay, value);
+    }
+
+    // Phase 11 — Router Mode status chip
+    private string _routerModeStatus = "Off";
+    public string RouterModeStatus
+    {
+        get => _routerModeStatus;
+        set => this.RaiseAndSetIfChanged(ref _routerModeStatus, value);
+    }
+
+    // Phase 17 — Streaming Ads Blocked counter
+    private string _streamingAdsBlockedToday = "0";
+    public string StreamingAdsBlockedToday
+    {
+        get => _streamingAdsBlockedToday;
+        set => this.RaiseAndSetIfChanged(ref _streamingAdsBlockedToday, value);
+    }
+
+    // Phase 18 — HTTPS Proxy statistics
+    private string _proxyStatus = "Off";
+    public string ProxyStatus
+    {
+        get => _proxyStatus;
+        set => this.RaiseAndSetIfChanged(ref _proxyStatus, value);
+    }
+
+    private string _proxyAdsBlocked = "0";
+    public string ProxyAdsBlocked
+    {
+        get => _proxyAdsBlocked;
+        set => this.RaiseAndSetIfChanged(ref _proxyAdsBlocked, value);
+    }
+
+    private int _proxyActiveConnections = 0;
+    public int ProxyActiveConnections
+    {
+        get => _proxyActiveConnections;
+        set => this.RaiseAndSetIfChanged(ref _proxyActiveConnections, value);
+    }
+
+    public DashboardViewModel(MainViewModel mainVm)
+    {
+        _mainVm = mainVm;
+
+        // Sync read-only dashboard metadata every 3 seconds
+        Observable
+            .Interval(TimeSpan.FromSeconds(3))
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(_ => RefreshDashboardMeta());
+
+        RefreshDashboardMeta(); // Initial sync
+    }
+
+    private string _sparklinePoints = "0,30 100,30";
+    public string SparklinePoints
+    {
+        get => _sparklinePoints;
+        set => this.RaiseAndSetIfChanged(ref _sparklinePoints, value);
+    }
+
+    private string _cacheHitRate = "0.0%";
+    public string CacheHitRate
+    {
+        get => _cacheHitRate;
+        set => this.RaiseAndSetIfChanged(ref _cacheHitRate, value);
+    }
+
+    private void RefreshDashboardMeta()
+    {
+        var urls = BlocklistManager.GetActiveBlocklistUrls();
+        ActiveBlocklistUrl = urls.Count > 1 ? $"{urls[0]} (+{urls.Count - 1} more)" : (urls.Count > 0 ? urls[0] : "None");
+
+        var tier = LicenseManager.CurrentTier;
+        LicenseTier = tier switch
+        {
+            LicenseManager.LicenseTier.Developer => "Developer (Unlimited)",
+            LicenseManager.LicenseTier.Founder => "Founder",
+            LicenseManager.LicenseTier.Enterprise => "Enterprise",
+            LicenseManager.LicenseTier.AegisPrime => "AegisPrime",
+            LicenseManager.LicenseTier.Pro => "Pro",
+            LicenseManager.LicenseTier.Basic => "Basic",
+            _ => "Community"
+        };
+        Debug.WriteLine($"[DashboardViewModel] LicenseTier label source=LicenseManager.CurrentTier, tier={tier}, label='{LicenseTier}'.");
+
+        AiProviderLabel = AiConfigManager.Settings.EnableAiSentinel
+            ? AiConfigManager.Settings.AiProvider
+            : "Off";
+
+        AiLearnedBlocklistCount = $"{AiLearnedBlocklist.Count} AI-learned blocks";
+
+        if (AiWatchdog.LastDetectionTime.HasValue)
+        {
+            var span = DateTime.UtcNow - AiWatchdog.LastDetectionTime.Value;
+            string timeStr = span.TotalMinutes < 1 ? "just now" : $"{(int)span.TotalMinutes} mins ago";
+            LastAiDetection = $"🤖 {AiWatchdog.LastDetectionDomain} — {timeStr}";
+        }
+        else
+        {
+            LastAiDetection = "No recent detections";
+        }
+
+        AiConfidenceSummary = $"{AiWatchdog.HighThreatCount} High, {AiWatchdog.CriticalThreatCount} Critical this session";
+
+        MetricsTotal = _mainVm.CurrentMetrics.Total.ToString("N0");
+        MetricsBlocked = _mainVm.CurrentMetrics.Blocked.ToString("N0");
+
+        double total = _mainVm.CurrentMetrics.Total;
+        if (total > 0)
+        {
+            double ratio = ((double)_mainVm.CurrentMetrics.Blocked / total) * 100.0;
+            BlockedRatio = $"{ratio:F1}%";
+
+            double cacheRatio = ((double)_mainVm.CurrentMetrics.CacheHits / total) * 100.0;
+            CacheHitRate = $"{cacheRatio:F1}%";
+        }
+        else
+        {
+            BlockedRatio = "0.0%";
+            CacheHitRate = "0.0%";
+        }
+
+        // Generate Sparkline Data
+        var history = _mainVm.CurrentHistory;
+        if (history != null && history.Count > 1)
+        {
+            const double width = 100.0;
+            const double height = 30.0;
+
+            var points = new System.Text.StringBuilder();
+            var deltas = new System.Collections.Generic.List<long>();
+
+            for (int i = 1; i < history.Count; i++)
+            {
+                long delta = history[i].TotalQueries - history[i - 1].TotalQueries;
+                if (delta < 0) delta = 0; // Prevent negatives if service restarted
+                deltas.Add(delta);
+            }
+
+            if (deltas.Count > 0)
+            {
+                long maxDelta = 1;
+                foreach (var d in deltas) if (d > maxDelta) maxDelta = d;
+
+                double stepX = deltas.Count > 1 ? width / (deltas.Count - 1) : width;
+
+                for (int i = 0; i < deltas.Count; i++)
+                {
+                    double x = i * stepX;
+                    double y = height - ((double)deltas[i] / maxDelta * height);
+                    points.Append(System.Globalization.CultureInfo.InvariantCulture, $"{x:F1},{y:F1} ");
+                }
+                SparklinePoints = points.ToString().Trim();
+            }
+        }
+        else
+        {
+            SparklinePoints = "0,30 100,30"; // Flat line fallback
+        }
+
+        // Update Top Domains
+        var topBlockedList = TopDomainsTracker.GetTopBlocked(5);
+        TopBlocked.Clear();
+        foreach (var item in topBlockedList)
+            TopBlocked.Add($"{item.Domain} ({item.Count})");
+
+        var topAllowedList = TopDomainsTracker.GetTopAllowed(5);
+        TopAllowed.Clear();
+        foreach (var item in topAllowedList)
+            TopAllowed.Add($"{item.Domain} ({item.Count})");
+
+        // XDP Status
+        int xdpMode = XdpConfigManager.Settings.XdpMode;
+        XdpStatus = xdpMode switch
+        {
+            1 => "Monitor",
+            2 => "Active",
+            _ => "Off"
+        };
+        XdpDropCount = MetricsManager.Current.XdpDroppedPackets.ToString("N0");
+
+        // Phase 11 — Upstream Latency
+        int latencyMs = MetricsManager.Current.UpstreamLatencyMs;
+        UpstreamLatencyMs = latencyMs;
+        UpstreamLatencyDisplay = latencyMs < 0 ? "—" : $"{latencyMs} ms";
+
+        // Phase 11 — Router Mode Status
+        RouterModeStatus = RouterConfigManager.Settings.EnableRouterMode ? "Active" : "Off";
+
+        // Phase 17 — Streaming Ads Blocked
+        StreamingAdsBlockedToday = MetricsManager.Current.StreamingAdsBlocked.ToString("N0");
+
+        // Phase 18 — HTTPS Proxy Meta
+        ProxyStatus = HttpsProxyConfigManager.Settings.EnableHttpsProxy ? "Active" : "Off";
+        ProxyAdsBlocked = MetricsManager.Current.ProxyAdsBlocked.ToString("N0");
+        // ProxyActiveConnections is currently only known by the service, 
+        // we'd need IPC to get the live count if we want it perfect, 
+        // but for now we'll just show the blocked count.
+    }
+}
+</file>
+
+<file path="src/AegisDNS.UI/ViewModels/MainViewModel.cs">
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Reactive;
+using System.Reactive.Linq;
+using System.Runtime.Versioning;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+
+using AegisDNS.Core;
+using AegisDNS.Core.Monitoring;
+using AegisDNS.Core.Utilities;
+using AegisDNS.UI;
+
+using Avalonia.Media;
+using Avalonia.Threading;
+
+using ReactiveUI;
+
+namespace AegisDNS.ViewModels;
+
+// UI ViewModel: logger injection deferred — Avalonia ViewModels are not DI-constructed; Debug.WriteLine retained.
+[SupportedOSPlatform("linux")]
+public class MainViewModel : ViewModelBase
+{
+    // --- Log Properties ---
+    public ObservableCollection<LogEntry> Logs { get; } = new();
+
+    // --- Dashboard Properties ---
+    private string _statusText = "OFFLINE";
+    private IBrush _statusBrush = Brushes.DimGray;
+    private string _blockedCountText = "0";
+    private string _lastRequestText = "Waiting for traffic...";
+    private IBrush _lastRequestBrush = Brushes.Gray;
+    private double _pulseBlur = 10;
+    private double _pulseTimer = 0;
+
+    // --- Protection Properties ---
+    private string _toggleBtnText = "ACTIVATE PROTECTION";
+    private IBrush _toggleBtnBrush = Brushes.DarkSlateGray;
+    private bool _isBusy = false;
+    private bool _isServiceOnline = false;
+
+    public class MetricsPayload { public long Total { get; set; } public long Blocked { get; set; } public long CacheHits { get; set; } }
+
+    private MetricsPayload _currentMetrics = new();
+    public MetricsPayload CurrentMetrics
+    {
+        get => _currentMetrics;
+        private set => this.RaiseAndSetIfChanged(ref _currentMetrics, value);
+    }
+
+    private List<MetricsSnapshot> _currentHistory = new();
+    public List<MetricsSnapshot> CurrentHistory
+    {
+        get => _currentHistory;
+        private set => this.RaiseAndSetIfChanged(ref _currentHistory, value);
+    }
+
+    private readonly CancellationTokenSource _cts = new();
+
+    public MainViewModel()
+    {
+        // --- Navigation ---
+        NavigateToDashboard = ReactiveCommand.Create(() => { });
+        NavigateToProtection = ReactiveCommand.Create(() => { });
+        NavigateToSettings = ReactiveCommand.Create(() => { });
+        ShowLog = ReactiveCommand.Create(() => { });
+
+        // --- Tray Commands ---
+        ToggleWindow = ReactiveCommand.Create(() =>
+        {
+            WindowToggleRequested?.Invoke(this, EventArgs.Empty);
+        });
+
+        ExitApp = ReactiveCommand.Create(() =>
+        {
+            AppExitRequested?.Invoke(this, EventArgs.Empty);
+        });
+
+        // --- Protection Commands ---
+        ToggleProtection = ReactiveCommand.CreateFromTask(async () =>
+        {
+            IsBusy = true;
+            var result = await IpcSystem.SendCommandAsync(new IpcSystem.IpcPacket("Toggle"));
+
+            await Task.Delay(500);
+            await UpdateState();
+            if (IsServiceOnline) AegisDNS.UI.Audio.AudioFeedbackManager.PlayActionSuccess();
+            IsBusy = false;
+        });
+
+        StartService = ReactiveCommand.CreateFromTask(async () =>
+        {
+            IsBusy = true;
+            OnLogReceived("🚀 Attempting to start AegisDNS Service...");
+            if (await ServiceLauncher.StartServiceAsync())
+            {
+                await Task.Delay(3000); // Wait for boot
+                await UpdateState();
+                if (IsServiceOnline) AegisDNS.UI.Audio.AudioFeedbackManager.PlayActionSuccess();
+            }
+            else
+            {
+                OnLogReceived("❌ Failure: Could not start the Aegis Service.");
+            }
+            IsBusy = false;
+        });
+
+        ForceStop = ReactiveCommand.CreateFromTask(async () =>
+        {
+            await IpcSystem.SendCommandAsync(new IpcSystem.IpcPacket("Toggle"));
+            await UpdateState();
+        });
+
+
+        // Start the broadcast listener with retry
+        Task.Run(() => ConnectWithRetryAsync(_cts.Token));
+
+        // Timer-based updates for status and counters
+        Observable.Interval(TimeSpan.FromMilliseconds(2000))
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Subscribe(async _ => await UpdateState());
+
+        ConfigManager.SettingsChanged += () =>
+        {
+            // Force UI update on main thread
+            Dispatcher.UIThread.InvokeAsync(RefreshSettings);
+        };
+    }
+
+    private async Task ConnectWithRetryAsync(CancellationToken token)
+    {
+        const int maxRetries = 10;
+        const int delayMs = 2000;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            if (token.IsCancellationRequested) return;
+
+            try
+            {
+                OnLogReceived($"📡 IPC connection attempt {attempt}/{maxRetries}...");
+                await IpcSystem.StartBroadcastClientAsync(OnLogReceived, token);
+
+                // If we get here, the client exited cleanly or the Socket closed — reconnect
+                OnLogReceived("⚠️ IPC broadcast disconnected. Reconnecting...");
+                attempt = 0; // Reset retry counter safely loop indefinitely while app runs
+                await Task.Delay(delayMs, token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                OnLogReceived($"⚠️ IPC attempt {attempt} failed: {ex.Message}");
+                if (attempt < maxRetries)
+                {
+                    await Task.Delay(delayMs, token);
+                }
+            }
+        }
+
+        OnLogReceived("❌ IPC connection failed after 10 retries. Service process may be dead.");
+        // UI thread dispatcher (fire and forget)
+        _ = Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            IsServiceOnline = false;
+            StatusText = "SERVICE DISCONNECTED";
+            StatusBrush = Brushes.DarkRed;
+        });
+    }
+
+    private void OnLogReceived(string message)
+    {
+        if (message == "TRIAL_EXPIRED")
+        {
+            Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                var licenseWindow = new LicenseWindow();
+                licenseWindow.Show();
+            });
+            return;
+        }
+
+        // Ensure the collection is updated on the UI thread
+        Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            var entry = LogEntry.Parse(message);
+            Logs.Add(entry);
+            if (Logs.Count > 500) // Keep the log buffer from growing infinitely
+            {
+                Logs.RemoveAt(0);
+            }
+
+            // Also update the dashboard's last request preview
+            if (ConfigManager.Settings.ShowTrafficPreview)
+            {
+                if (message.StartsWith("🔎") || message.StartsWith("🚫"))
+                {
+                    string displayMsg = message.Length > 45 ? message.Substring(0, 42) + "..." : message;
+                    var brush = message.StartsWith("🚫") ? Brushes.Red : Brushes.Gray;
+                    LastRequestText = displayMsg;
+                    LastRequestBrush = brush;
+                }
+            }
+
+            if (message.Contains("sentinel", StringComparison.OrdinalIgnoreCase) && message.Contains("🚫"))
+            {
+                AiThreatDetected?.Invoke(this, message);
+            }
+        });
+    }
+
+    private async Task UpdateState()
+    {
+        // 1. Try IPC for Service Status
+        var statusPacket = await IpcSystem.SendCommandAsync(new IpcSystem.IpcPacket("GetStatus"));
+        System.Diagnostics.Debug.WriteLine($"[MainViewModel.UpdateState] IPC GetStatus response: null={statusPacket == null}, command='{statusPacket?.Command ?? "<null>"}', payload='{statusPacket?.Payload ?? "<null>"}'");
+        IsServiceOnline = statusPacket != null;
+        bool isEngineRunning = statusPacket?.Payload == "ONLINE";
+
+        // 2. Sync metrics if service is online
+        if (isEngineRunning)
+        {
+            var metricsPacket = await IpcSystem.SendCommandAsync(new IpcSystem.IpcPacket("GetMetrics"));
+            if (!string.IsNullOrEmpty(metricsPacket?.Payload))
+            {
+                try
+                {
+                    CurrentMetrics = JsonSerializer.Deserialize<MetricsPayload>(metricsPacket.Payload) ?? new();
+                    BlockedCountText = CurrentMetrics.Blocked.ToString("N0");
+                }
+                catch (JsonException ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"⚠️ JSON invalid: {ex.Message}");
+                    CurrentMetrics = new();
+                    BlockedCountText = CurrentMetrics.Blocked.ToString("N0");
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"⚠️ Load failed: {ex.Message}");
+                    CurrentMetrics = new();
+                    BlockedCountText = CurrentMetrics.Blocked.ToString("N0");
+                }
+            }
+
+            var historyPacket = await IpcSystem.SendCommandAsync(new IpcSystem.IpcPacket("GetHistory"));
+            if (!string.IsNullOrEmpty(historyPacket?.Payload))
+            {
+                try
+                {
+                    CurrentHistory = JsonSerializer.Deserialize<List<MetricsSnapshot>>(historyPacket.Payload) ?? new();
+                }
+                catch (JsonException ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"⚠️ JSON invalid: {ex.Message}");
+                    CurrentHistory = new();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"⚠️ Load failed: {ex.Message}");
+                    CurrentHistory = new();
+                }
+            }
+        }
+
+        StatusText = isEngineRunning ? "ONLINE 🛡️" : (IsServiceOnline ? "OFFLINE" : "SERVICE DISCONNECTED");
+        StatusBrush = isEngineRunning ? Brushes.LimeGreen : Brushes.DimGray;
+
+        ToggleBtnText = isEngineRunning ? "DEACTIVATE PROTECTION" : "ACTIVATE PROTECTION";
+        ToggleBtnBrush = isEngineRunning ? Brushes.DarkRed : Brushes.DarkSlateGray;
+
+        if (isEngineRunning && ConfigManager.Settings.EnableNeonGlow)
+        {
+            _pulseTimer += 0.1;
+            PulseBlur = 8 + (Math.Sin(_pulseTimer) * 4);
+        }
+        else
+        {
+            PulseBlur = 0;
+        }
+    }
+
+    // --- Bindable Properties for Dashboard ---
+    public string StatusText { get => _statusText; set => this.RaiseAndSetIfChanged(ref _statusText, value); }
+    public IBrush StatusBrush { get => _statusBrush; set => this.RaiseAndSetIfChanged(ref _statusBrush, value); }
+    public string BlockedCountText { get => _blockedCountText; set => this.RaiseAndSetIfChanged(ref _blockedCountText, value); }
+    public string LastRequestText { get => _lastRequestText; set => this.RaiseAndSetIfChanged(ref _lastRequestText, value); }
+    public IBrush LastRequestBrush { get => _lastRequestBrush; set => this.RaiseAndSetIfChanged(ref _lastRequestBrush, value); }
+    public double PulseBlur { get => _pulseBlur; set => this.RaiseAndSetIfChanged(ref _pulseBlur, value); }
+
+    // --- Bindable Properties for Protection ---
+    public string ToggleBtnText { get => _toggleBtnText; set => this.RaiseAndSetIfChanged(ref _toggleBtnText, value); }
+    public IBrush ToggleBtnBrush { get => _toggleBtnBrush; set => this.RaiseAndSetIfChanged(ref _toggleBtnBrush, value); }
+    public bool IsBusy { get => _isBusy; set => this.RaiseAndSetIfChanged(ref _isBusy, value); }
+    public bool IsServiceOnline { get => _isServiceOnline; set => this.RaiseAndSetIfChanged(ref _isServiceOnline, value); }
+
+    public ReactiveCommand<Unit, Unit> ToggleProtection { get; }
+    public ReactiveCommand<Unit, Unit> StartService { get; }
+    public ReactiveCommand<Unit, Unit> ForceStop { get; }
+
+
+    // --- Navigation ---
+    public ReactiveCommand<Unit, Unit> NavigateToDashboard { get; }
+    public ReactiveCommand<Unit, Unit> NavigateToProtection { get; }
+    public ReactiveCommand<Unit, Unit> NavigateToSettings { get; }
+    public ReactiveCommand<Unit, Unit> ShowLog { get; }
+
+    // --- Tray Commands ---
+    public ReactiveCommand<Unit, Unit> ToggleWindow { get; }
+    public ReactiveCommand<Unit, Unit> ExitApp { get; }
+
+    public event EventHandler? WindowToggleRequested;
+    public event EventHandler? AppExitRequested;
+    public event EventHandler<string>? AiThreatDetected;
+
+    public bool IsStealthMode
+    {
+        get => ConfigManager.Settings.StealthMode;
+        set { /* Read-only reflection of config, but setter needed for binding if two-way */ }
+    }
+
+    public void RefreshSettings()
+    {
+        this.RaisePropertyChanged(nameof(IsStealthMode));
+    }
+
+    // Call this when the application is closing to stop the listener
+    public void Stop()
+    {
+        _cts.Cancel();
+    }
+}
+</file>
+
+<file path="src/AegisDNS.UI/ViewModels/SettingsViewModel.cs">
+using System;
+using System.Reactive;
+using System.Runtime.Versioning;
+using System.Threading.Tasks;
+
+using AegisDNS.Core;
+using AegisDNS.Core.Ai;
+using AegisDNS.Core.Utilities;
+using AegisDNS.Licensing;
+
+using Avalonia.Media;
+
+using Microsoft.Extensions.Logging.Abstractions;
+
+using ReactiveUI;
+
+namespace AegisDNS.ViewModels;
+
+[SupportedOSPlatform("linux")]
+public class SettingsViewModel : ViewModelBase
+{
+    private readonly UpdateManager _updateManager = new(NullLogger<UpdateManager>.Instance);
+    private string _updateStatus = "Ready";
+
+    public SettingsViewModel()
+    {
+        SaveSettings = ReactiveCommand.CreateFromTask(async () =>
+        {
+            await Task.Run(() =>
+            {
+                ConfigManager.Save();
+                AiConfigManager.Save();
+                BlocklistConfigManager.Save();
+                DnsConfigManager.Save();
+                XdpConfigManager.Save();
+            });
+            return Unit.Default;
+        });
+
+        CheckForUpdates = ReactiveCommand.CreateFromTask(async () =>
+        {
+            UpdateStatus = "Checking...";
+            var update = await _updateManager.CheckForUpdatesAsync();
+            if (update != null)
+            {
+                UpdateStatus = $"Update Found: v{update.Version}. Downloading...";
+                bool success = await _updateManager.DownloadAndInstallAsync(update);
+                if (success) UpdateStatus = "Update started. App will restart.";
+                else UpdateStatus = "Update failed (Check console).";
+            }
+            else
+            {
+                UpdateStatus = "You are up to date.";
+            }
+        });
+
+        UpdateBlocklistsNow = ReactiveCommand.CreateFromTask(async () =>
+        {
+            UpdateStatus = "Triggering blocklist update...";
+            var result = await IpcSystem.SendCommandAsync(new IpcSystem.IpcPacket("UpdateBlocklists"));
+            if (result != null && result.Command == "UpdateResponse")
+            {
+                UpdateStatus = "Blocklist update initiated in background.";
+            }
+            else
+            {
+                UpdateStatus = "Failed to communicate with Aegis service.";
+            }
+        });
+    }
+
+    public string UpdateStatus
+    {
+        get => _updateStatus;
+        set => this.RaiseAndSetIfChanged(ref _updateStatus, value);
+    }
+
+    public ReactiveCommand<Unit, Unit> CheckForUpdates { get; }
+    public ReactiveCommand<Unit, Unit> UpdateBlocklistsNow { get; }
+
+    public bool StartOnBoot
+    {
+        get => ConfigManager.Settings.StartOnBoot;
+        set
+        {
+            ConfigManager.Settings.StartOnBoot = value;
+            BootManager.SetStartup(value);
+            this.RaisePropertyChanged();
+        }
+    }
+
+    public bool StartMinimized
+    {
+        get => ConfigManager.Settings.StartMinimized;
+        set { ConfigManager.Settings.StartMinimized = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool MinimizeToTray
+    {
+        get => ConfigManager.Settings.MinimizeToTray;
+        set { ConfigManager.Settings.MinimizeToTray = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool StealthMode
+    {
+        get => ConfigManager.Settings.StealthMode;
+        set { ConfigManager.Settings.StealthMode = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool EnableNeonGlow
+    {
+        get => ConfigManager.Settings.EnableNeonGlow;
+        set { ConfigManager.Settings.EnableNeonGlow = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool ShowTrafficPreview
+    {
+        get => ConfigManager.Settings.ShowTrafficPreview;
+        set { ConfigManager.Settings.ShowTrafficPreview = value; this.RaisePropertyChanged(); }
+    }
+
+    public string AccentColor
+    {
+        get => ConfigManager.Settings.AccentColor;
+        set { ConfigManager.Settings.AccentColor = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool AutoUpdateBlocklists
+    {
+        get => ConfigManager.Settings.AutoUpdateBlocklists;
+        set { ConfigManager.Settings.AutoUpdateBlocklists = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool LogDnsRequests
+    {
+        get => ConfigManager.Settings.LogDnsRequests;
+        set { ConfigManager.Settings.LogDnsRequests = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool BlockMalwareDomains
+    {
+        get => BlocklistConfigManager.Settings.BlockMalwareDomains;
+        set { BlocklistConfigManager.Settings.BlockMalwareDomains = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool BlockAdultContent
+    {
+        get => BlocklistConfigManager.Settings.BlockAdultContent;
+        set { BlocklistConfigManager.Settings.BlockAdultContent = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool EnableWeeklySummary
+    {
+        get => ConfigManager.Settings.EnableWeeklySummary;
+        set { ConfigManager.Settings.EnableWeeklySummary = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool EnableDailySummary
+    {
+        get => ConfigManager.Settings.EnableDailySummary;
+        set { ConfigManager.Settings.EnableDailySummary = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool BlockTelemetry
+    {
+        get => BlocklistConfigManager.Settings.BlockTelemetry;
+        set { BlocklistConfigManager.Settings.BlockTelemetry = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool EnableEbpf
+    {
+        get => XdpConfigManager.Settings.EnableEbpf;
+        set { XdpConfigManager.Settings.EnableEbpf = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool TelemetryOptIn
+    {
+        get => ConfigManager.Settings.TelemetryOptIn;
+        set
+        {
+            ConfigManager.Settings.TelemetryOptIn = value;
+            TelemetryBlocker.ApplyBlocking(!value);
+            this.RaisePropertyChanged();
+        }
+    }
+
+    public bool IsEnterprise
+    {
+        get
+        {
+#if DEBUG
+            return true;
+#else
+            return false;
+#endif
+        }
+    }
+
+    // --- Hagezi Blocklist Toggles ---
+
+    public bool EnableThreatIntelligence
+    {
+        get => BlocklistConfigManager.Settings.EnableThreatIntelligence;
+        set { BlocklistConfigManager.Settings.EnableThreatIntelligence = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool EnableGamingLauncherBlocking
+    {
+        get => BlocklistConfigManager.Settings.EnableGamingLauncherBlocking;
+        set { BlocklistConfigManager.Settings.EnableGamingLauncherBlocking = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool EnableFakeBlocking
+    {
+        get => BlocklistConfigManager.Settings.EnableFakeBlocking;
+        set { BlocklistConfigManager.Settings.EnableFakeBlocking = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool EnablePopUpAdsBlocking
+    {
+        get => BlocklistConfigManager.Settings.EnablePopUpAdsBlocking;
+        set { BlocklistConfigManager.Settings.EnablePopUpAdsBlocking = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool EnableDynamicDnsBlocking
+    {
+        get => BlocklistConfigManager.Settings.EnableDynamicDnsBlocking;
+        set { BlocklistConfigManager.Settings.EnableDynamicDnsBlocking = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool EnableNrdBlocking
+    {
+        get => BlocklistConfigManager.Settings.EnableNrdBlocking;
+        set { BlocklistConfigManager.Settings.EnableNrdBlocking = value; this.RaisePropertyChanged(); }
+    }
+
+    public bool EnableGamblingBlocking
+    {
+        get => BlocklistConfigManager.Settings.EnableGamblingBlocking;
+        set { BlocklistConfigManager.Settings.EnableGamblingBlocking = value; this.RaisePropertyChanged(); }
+    }
+
+    public string ActiveBlocklistTier
+    {
+        get
+        {
+#if DEBUG
+            return "DEVELOPER UNLIMITED (Enterprise)";
+#else
+            var tier = LicenseManager.LicenseTier.Community;
+
+
+            return tier switch
+            {
+                LicenseManager.LicenseTier.Pro or 
+                LicenseManager.LicenseTier.AegisPrime or 
+                LicenseManager.LicenseTier.Enterprise or
+                LicenseManager.LicenseTier.Founder or
+                LicenseManager.LicenseTier.Developer => "Hagezi Pro Plus (Max Protection)",
+                _ => "Hagezi Normal (Standard Protection)"
+            };
+#endif
+        }
+    }
+
+    public string PrimaryDns
+    {
+        get => DnsConfigManager.Settings.PrimaryDns;
+        set
+        {
+            if (System.Net.IPAddress.TryParse(value, out _))
+            {
+                DnsConfigManager.Settings.PrimaryDns = value;
+                this.RaisePropertyChanged();
+            }
+            // Else ignore invalid input, or we could add an error property.
+            // For now, strict rejection is safer than saving bad data.
+        }
+    }
+
+    public string PreferredAdapter
+    {
+        get => DnsConfigManager.Settings.PreferredAdapter;
+        set { DnsConfigManager.Settings.PreferredAdapter = value; this.RaisePropertyChanged(); }
+    }
+
+    public int CacheSize
+    {
+        get => ConfigManager.Settings.CacheSize;
+        set
+        {
+            // Validate: Min 100, Max 100,000
+            if (value < 100) value = 100;
+            if (value > 100000) value = 100000;
+            ConfigManager.Settings.CacheSize = value;
+            this.RaisePropertyChanged();
+        }
+    }
+
+    public bool EnableAiSentinel
+    {
+        get => AiConfigManager.Settings.EnableAiSentinel;
+        set { AiConfigManager.Settings.EnableAiSentinel = value; this.RaisePropertyChanged(); }
+    }
+
+    public string AiProvider
+    {
+        get => AiConfigManager.Settings.AiProvider;
+        set { AiConfigManager.Settings.AiProvider = value; this.RaisePropertyChanged(); }
+    }
+
+    private void EnsureFallbackList(int count)
+    {
+        while (AiConfigManager.Settings.FallbackProviders.Count < count)
+        {
+            AiConfigManager.Settings.FallbackProviders.Add("None");
+        }
+    }
+
+    public string FallbackProvider1
+    {
+        get { EnsureFallbackList(1); return AiConfigManager.Settings.FallbackProviders[0]; }
+        set { EnsureFallbackList(1); AiConfigManager.Settings.FallbackProviders[0] = value; this.RaisePropertyChanged(); }
+    }
+
+    public string FallbackProvider2
+    {
+        get { EnsureFallbackList(2); return AiConfigManager.Settings.FallbackProviders[1]; }
+        set { EnsureFallbackList(2); AiConfigManager.Settings.FallbackProviders[1] = value; this.RaisePropertyChanged(); }
+    }
+
+    public string FallbackProvider3
+    {
+        get { EnsureFallbackList(3); return AiConfigManager.Settings.FallbackProviders[2]; }
+        set { EnsureFallbackList(3); AiConfigManager.Settings.FallbackProviders[2] = value; this.RaisePropertyChanged(); }
+    }
+
+    // API keys stored in encrypted vault: SecureCredentialStore
+
+    public string AiEndpoint
+    {
+        get => AiConfigManager.Settings.AiEndpoint;
+        set
+        {
+            if (Uri.TryCreate(value, UriKind.Absolute, out _))
+            {
+                AiConfigManager.Settings.AiEndpoint = value;
+                this.RaisePropertyChanged();
+            }
+        }
+    }
+
+    public string AiModel
+    {
+        get => AiConfigManager.Settings.AiModel;
+        set
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                AiConfigManager.Settings.AiModel = value;
+                this.RaisePropertyChanged();
+            }
+        }
+    }
+
+    public int AiCheckIntervalMinutes
+    {
+        get => AiConfigManager.Settings.AiCheckIntervalMinutes;
+        set
+        {
+            // Validate: Min 5 minutes, Max 1 day (1440)
+            if (value < 5) value = 5;
+            if (value > 1440) value = 1440;
+            AiConfigManager.Settings.AiCheckIntervalMinutes = value;
+            this.RaisePropertyChanged();
+        }
+    }
+
+    public ReactiveCommand<Unit, Unit> SaveSettings { get; }
+}
+</file>
+
+</files>

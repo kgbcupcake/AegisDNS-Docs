@@ -1,0 +1,761 @@
+This file is a merged representation of a subset of the codebase, containing specifically included files, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Only files matching these patterns are included: kernel/aegisdns.bpf.c, kernel/aegisdns.bpf.h, src/AegisDNS.XdpLoader/xdp/aegis_xdp.c
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+kernel/
+  aegisdns.bpf.c
+  aegisdns.bpf.h
+src/
+  AegisDNS.XdpLoader/
+    xdp/
+      aegis_xdp.c
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="src/AegisDNS.XdpLoader/xdp/aegis_xdp.c">
+// SPDX-License-Identifier: GPL-2.0
+// AegisDNS XDP Ingress Shield — Phase 15
+// Inspects incoming DNS responses at the NIC driver level.
+// Drops: spoofed IPs, RFC1918 rebinding attacks, malformed DNS packets.
+
+#include <linux/bpf.h>
+#include <linux/if_ether.h>
+#include <linux/in.h>
+#include <linux/ip.h>
+#include <linux/udp.h>
+#include <bpf/bpf_helpers.h>
+#include <bpf/bpf_endian.h>
+
+// ── Event struct — mirrored in XdpStructs.cs ────────────────────────────────
+struct aegis_xdp_event {
+    __u32 src_ip;
+    __u16 dns_txid;
+    __u8  reason;
+    __u8  pad;      /* explicit padding — do not remove */
+};
+
+// ── Reason codes ────────────────────────────────────────────────────────────
+#define REASON_BLOCKED_IP     0x01
+#define REASON_RFC1918_REBIND 0x02
+#define REASON_MALFORMED      0x03
+
+// ── BPF Maps ────────────────────────────────────────────────────────────────
+
+// Blocked source IPs — populated by AegisXdpLoader.AddBlockedIp()
+struct {
+    __uint(type, BPF_MAP_TYPE_LRU_HASH);
+    __uint(max_entries, 65536);
+    __type(key, __u32);    // IPv4 source IP (network byte order)
+    __type(value, __u8);   // reason code
+} xdp_blocked_ips SEC(".maps");
+
+// Ring buffer for drop events → consumed by AegisXdpLoader.cs
+struct {
+    __uint(type, BPF_MAP_TYPE_RINGBUF);
+    __uint(max_entries, 262144); // 256KB
+} xdp_events SEC(".maps");
+
+// Per-CPU drop counter — read by AegisXdpLoader.GetDropCount()
+struct {
+    __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+    __uint(max_entries, 1);
+    __type(key, __u32);
+    __type(value, __u64);
+} xdp_drop_counter SEC(".maps");
+
+// ── Helper: emit drop event + increment counter ─────────────────────────────
+static __always_inline void emit_drop(
+    __u32 src_ip, __u16 dns_txid, __u8 reason)
+{
+    // Increment per-CPU drop counter
+    __u32 key = 0;
+    __u64 *count = bpf_map_lookup_elem(&xdp_drop_counter, &key);
+    if (count)
+        __sync_fetch_and_add(count, 1);
+
+    // Emit event to ring buffer
+    struct aegis_xdp_event *evt;
+    evt = bpf_ringbuf_reserve(&xdp_events, sizeof(*evt), 0);
+    if (evt) {
+        evt->src_ip   = src_ip;
+        evt->dns_txid = dns_txid;
+        evt->reason   = reason;
+        evt->pad      = 0;
+        bpf_ringbuf_submit(evt, 0);
+    }
+}
+
+// ── Helper: check if an IP is RFC 1918 private ──────────────────────────────
+static __always_inline int is_rfc1918(__u32 ip_be)
+{
+    // ip_be is in network byte order (big endian)
+    __u8 b0 = (ip_be      ) & 0xFF;  // first octet
+    __u8 b1 = (ip_be >> 8 ) & 0xFF;  // second octet
+
+    // 10.0.0.0/8
+    if (b0 == 10)
+        return 1;
+
+    // 172.16.0.0/12 (172.16 - 172.31)
+    if (b0 == 172 && (b1 >= 16 && b1 <= 31))
+        return 1;
+
+    // 192.168.0.0/16
+    if (b0 == 192 && b1 == 168)
+        return 1;
+
+    return 0;
+}
+
+// ── XDP Program ─────────────────────────────────────────────────────────────
+SEC("xdp")
+int xdp_ingress(struct xdp_md *ctx)
+{
+    void *data     = (void *)(long)ctx->data;
+    void *data_end = (void *)(long)ctx->data_end;
+
+    // ── Parse Ethernet header ───────────────────────────────────────────
+    struct ethhdr *eth = data;
+    if ((void *)(eth + 1) > data_end)
+        return XDP_PASS;
+
+    // Only process IPv4
+    if (eth->h_proto != bpf_htons(ETH_P_IP))
+        return XDP_PASS;
+
+    // ── Parse IP header ─────────────────────────────────────────────────
+    struct iphdr *ip = (void *)(eth + 1);
+    if ((void *)(ip + 1) > data_end)
+        return XDP_PASS;
+
+    // Only process UDP
+    if (ip->protocol != IPPROTO_UDP)
+        return XDP_PASS;
+
+    // ── Parse UDP header ────────────────────────────────────────────────
+    /* Validate IHL */
+    if (ip->ihl < 5 || ip->ihl > 15)
+        return XDP_PASS;
+    if ((void *)ip + (ip->ihl * 4) > data_end)
+        return XDP_PASS;
+    struct udphdr *udp = (void *)ip + (ip->ihl * 4);
+    if ((void *)(udp + 1) > data_end)
+        return XDP_PASS;
+
+    // Only process source port 53 (DNS responses come FROM port 53)
+    if (udp->source != bpf_htons(53))
+        return XDP_PASS;
+
+    // ── DNS response payload ────────────────────────────────────────────
+    void *dns_start = (void *)(udp + 1);
+    // DNS header is 12 bytes minimum
+    if (dns_start + 12 > data_end) {
+        // Malformed — DNS header too short
+        emit_drop(ip->saddr, 0, REASON_MALFORMED);
+        return XDP_DROP;
+    }
+
+    // Read DNS transaction ID (first 2 bytes)
+    __u16 dns_txid = *(__u16 *)dns_start;
+
+    // Read DNS flags (bytes 2-3)
+    __u16 dns_flags = *(__u16 *)(dns_start + 2);
+    // QR bit is bit 15 (MSB of first byte in network order)
+    // In network byte order, QR=1 means this is a response
+    if (!(dns_flags & bpf_htons(0x8000)))
+        return XDP_PASS; // Not a response — pass through
+
+    // ── CHECK 1: Blocked source IP ──────────────────────────────────────
+    __u8 *blocked_reason = bpf_map_lookup_elem(&xdp_blocked_ips, &ip->saddr);
+    if (blocked_reason) {
+        emit_drop(ip->saddr, bpf_ntohs(dns_txid), REASON_BLOCKED_IP);
+        return XDP_DROP;
+    }
+
+    // ── CHECK 2: RFC 1918 rebinding attack ──────────────────────────────
+    // Parse the first answer record to check if it resolves to a private IP.
+    // DNS header: 12 bytes. Then QDCOUNT questions.
+    // Read QDCOUNT (bytes 4-5)
+    __u16 qdcount = bpf_ntohs(*(__u16 *)(dns_start + 4));
+    // Read ANCOUNT (bytes 6-7)
+    __u16 ancount = bpf_ntohs(*(__u16 *)(dns_start + 6));
+
+    if (ancount == 0 || qdcount == 0)
+        return XDP_PASS; // No answers to inspect
+
+    /* Only safely handle single-question responses in XDP */
+    if (qdcount > 1)
+        return XDP_PASS;
+
+    // Skip the question section — each question is: name + 4 bytes (QTYPE + QCLASS)
+    // We can only safely parse the first question with bounded iteration.
+    void *ptr = dns_start + 12;
+
+    // Skip question name (series of labels ending with 0x00 or compression pointer)
+    // Bound iteration to prevent verifier rejection
+    #pragma unroll
+    for (int i = 0; i < 64; i++) {
+        if (ptr + 1 > data_end)
+            return XDP_PASS;
+
+        __u8 label_len = *(__u8 *)ptr;
+
+        if (label_len == 0) {
+            ptr += 1;   // null terminator
+            break;
+        }
+
+        // Compression pointer (0xC0 or higher in top 2 bits)
+        if ((label_len & 0xC0) == 0xC0) {
+            ptr += 2;   // skip 2-byte pointer
+            break;
+        }
+
+        /* RFC 1035: max label length is 63 */
+        if (label_len > 63)
+            return XDP_PASS;
+
+        ptr += 1 + label_len;  // skip label length byte + label data
+    }
+
+    // Skip QTYPE (2 bytes) + QCLASS (2 bytes)
+    ptr += 4;
+    if (ptr > data_end)
+        return XDP_PASS;
+
+    // Now at the first answer record
+    // Answer: NAME (may be compressed) + TYPE(2) + CLASS(2) + TTL(4) + RDLENGTH(2) + RDATA
+    // Skip answer name
+    if (ptr + 1 > data_end)
+        return XDP_PASS;
+
+    __u8 ans_label = *(__u8 *)ptr;
+    if ((ans_label & 0xC0) == 0xC0) {
+        ptr += 2;  // compression pointer
+    } else {
+        // Skip labels — bounded
+        #pragma unroll
+        for (int i = 0; i < 64; i++) {
+            if (ptr + 1 > data_end)
+                return XDP_PASS;
+            __u8 ll = *(__u8 *)ptr;
+            if (ll == 0) { ptr += 1; break; }
+            if ((ll & 0xC0) == 0xC0) { ptr += 2; break; }
+            /* RFC 1035: max label length is 63 */
+            if (ll > 63) return XDP_PASS;
+            ptr += 1 + ll;
+        }
+    }
+
+    // TYPE(2) + CLASS(2) + TTL(4) + RDLENGTH(2) = 10 bytes
+    if (ptr + 10 > data_end)
+        return XDP_PASS;
+
+    __u16 rr_type = bpf_ntohs(*(__u16 *)ptr);
+    __u16 rdlength = bpf_ntohs(*(__u16 *)(ptr + 8));
+    ptr += 10;
+
+    // Only check A records (type 1) with RDLENGTH == 4
+    if (rr_type == 1 && rdlength == 4) {
+        if (ptr + 4 > data_end)
+            return XDP_PASS;
+
+        __u32 answer_ip = *(__u32 *)ptr;
+
+        if (is_rfc1918(answer_ip)) {
+            emit_drop(ip->saddr, bpf_ntohs(dns_txid), REASON_RFC1918_REBIND);
+            return XDP_DROP;
+        }
+    }
+
+    return XDP_PASS;
+}
+
+char _license[] SEC("license") = "GPL";
+</file>
+
+<file path="kernel/aegisdns.bpf.c">
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * aegisdns.bpf.c — AegisDNS eBPF kernel program.
+ *
+ * Intercepts all DNS traffic (UDP port 53) at the cgroup/skb level.
+ * Checks a userspace-populated block map and drops blocked queries.
+ * Emits events to a ring buffer for userspace processing.
+ *
+ * This program runs inside the Linux kernel. The BPF verifier enforces
+ * memory safety — every pointer dereference must be bounds-checked.
+ *
+ * Copyright (c) 2026 AegisDNS. All rights reserved.
+ */
+
+#include "vmlinux.h"
+#include <bpf/bpf_helpers.h>
+#include <bpf/bpf_endian.h>
+#include <bpf/bpf_tracing.h>
+#include "aegisdns.bpf.h"
+
+/* Licence declaration is mandatory for BPF programs that use GPL helpers */
+char LICENSE[] SEC("license") = "GPL";
+
+/* ── MAP 1: Ring buffer — kernel writes events, userspace reads them ──────── */
+/* Capacity: 4 MB ring buffer (~16,000 events before wrapping)               */
+struct {
+    __uint(type, BPF_MAP_TYPE_RINGBUF);
+    __uint(max_entries, 4 * 1024 * 1024);
+} aegis_events SEC(".maps");
+
+/* ── MAP 2: Block decision hash map — userspace writes, kernel reads ──────── */
+/* Max 500,000 entries covers all Hagezi blocklist entries                    */
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 500000);
+    __type(key,   struct aegis_block_key);
+    __type(value, struct aegis_block_val);
+} aegis_blocks SEC(".maps");
+
+/* ── MAP 3: Per-CPU stats — total intercepted, total blocked ─────────────── */
+struct aegis_stats {
+    __u64 total_intercepted;
+    __u64 total_blocked;
+    __u64 total_passed;
+};
+
+struct {
+    __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+    __uint(max_entries, 1);
+    __type(key,   __u32);
+    __type(value, struct aegis_stats);
+} aegis_stats_map SEC(".maps");
+
+/* ── MAP 4: Per-CPU domain scratch buffer — avoids BPF 512-byte stack limit  */
+struct aegis_domain_buf {
+    char domain[AEGIS_MAX_DOMAIN_LEN];
+};
+
+struct {
+    __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+    __uint(max_entries, 1);
+    __type(key,   __u32);
+    __type(value, struct aegis_domain_buf);
+} aegis_domain_scratch SEC(".maps");
+
+/* ── MAP 5: Per-CPU block-key scratch buffer — avoids BPF stack limit ──────  */
+struct {
+    __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+    __uint(max_entries, 1);
+    __type(key,   __u32);
+    __type(value, struct aegis_block_key);
+} aegis_key_scratch SEC(".maps");
+
+/* ── CONTEXT: Passed to copy_callback via bpf_loop ──────────────────────── */
+/*                                                                            */
+/* Lives on copy_label's stack frame.  bpf_loop passes a PTR_TO_MEM to the  */
+/* callback — all fields are readable and writable by the callback.          */
+struct copy_ctx {
+    __u8  bytes[64]; /* label bytes pre-loaded from the packet         */
+    __u32 len;       /* number of valid bytes in bytes[] (≤ 63)        */
+    __u32 pos;       /* write cursor into aegis_domain_scratch->domain */
+};
+
+/* ── CALLBACK: Per-byte logic — verifier sees this body exactly once ─────── */
+/*                                                                            */
+/* bpf_loop() is a BPF helper (kernel ≥ 5.17).  The verifier treats the     */
+/* entire loop as a single BPF_CALL instruction and never iterates over this */
+/* body, making state explosion impossible by design.                        */
+/*                                                                            */
+/* skb is NOT in the context because storing PTR_TO_CTX through a void *ctx */
+/* loses the type — the verifier would see a scalar, not PTR_TO_CTX, inside */
+/* the callback.  Instead, copy_label pre-loads the label bytes into         */
+/* ctx->bytes[] before the bpf_loop call.  The callback works entirely from  */
+/* plain ctx memory and a global map lookup; no skb pointer is needed.       */
+/*                                                                            */
+/* Returns 0 (continue) or 1 (stop).                                        */
+static int
+copy_callback(__u32 index, void *_ctx)
+{
+    struct copy_ctx *ctx = _ctx;
+
+    if (index >= ctx->len)
+        return 1; /* past this label's bytes — stop */
+
+    __u32 zero = 0;
+    struct aegis_domain_buf *out = bpf_map_lookup_elem(&aegis_domain_scratch, &zero);
+    if (!out)
+        return 1;
+
+    /* index & 63 proves the array access is in-bounds to the verifier
+     * (index ≤ 62 from bpf_loop, so & 63 is a no-op at runtime). */
+    __u8 c = ctx->bytes[index & 63];
+    if (c >= 'A' && c <= 'Z') c |= 32;
+    /* Load pos into a local __u32 before using it as a map-value offset.
+     * Without this, LLVM emits a sign-extend (s>>=32) on the 32-bit struct
+     * field load, which the verifier rejects as a potentially negative offset. */
+    __u32 p = ctx->pos;
+    if (p < AEGIS_MAX_DOMAIN_LEN - 1) {
+        out->domain[p] = c;
+        ctx->pos = p + 1;
+    }
+
+    return 0; /* continue */
+}
+
+/* ── SUBPROGRAM: Copy one DNS label into the output buffer ───────────────── */
+/*                                                                            */
+/* Pre-loads the label's bytes from the packet (skb is PTR_TO_CTX here),    */
+/* then delegates per-byte processing to copy_callback via bpf_loop().       */
+/* The verifier sees the loop as one helper call — no back-edges, no state   */
+/* explosion regardless of label length.                                     */
+/*                                                                            */
+/* Output is written directly to aegis_domain_scratch by the callback;       */
+/* the out parameter is therefore not needed and is absent.                  */
+/*                                                                            */
+/* BPF subprograms accept at most 5 arguments — 3 used here: skb, off, pos. */
+/*                                                                            */
+/* Returns the updated write position.                                        */
+static __attribute__((noinline)) __u32
+copy_label(struct __sk_buff *skb, __u32 off, __u32 pos)
+{
+    __u8 label_len = 0;
+
+    if (off == 0) return pos;
+    if (bpf_skb_load_bytes(skb, off - 1, &label_len, 1) < 0) return pos;
+    if (label_len == 0 || label_len > 63) return pos;
+
+    struct copy_ctx ctx = {};
+    ctx.len = (__u32)label_len;
+    ctx.pos = pos;
+
+    /* Pre-load all label bytes in one call while skb is still PTR_TO_CTX.
+     * label_len ≤ 63 < 64 = sizeof(ctx.bytes), so the write is in-bounds. */
+    if (bpf_skb_load_bytes(skb, off, ctx.bytes, label_len) < 0) return pos;
+
+    bpf_loop(63, copy_callback, &ctx, 0);
+
+    return ctx.pos;
+}
+
+/* ── SUBPROGRAM: Extract domain name from raw DNS wire format ────────────── */
+/*                                                                            */
+/* DNS wire format uses length-prefixed labels: \x06google\x03com\x00         */
+/* This converts it to dotted notation: google.com                           */
+/*                                                                            */
+/* Label bytes are written to aegis_domain_scratch by copy_callback() via    */
+/* bpf_loop() inside copy_label().  This subprogram handles only label       */
+/* iteration, dot insertion into out[], and off advancement.                 */
+/* The verifier sees each copy_label call as a single BPF_CALL instruction.  */
+/*                                                                            */
+/* Returns the number of characters written to `out`, or 0 on empty/error.   */
+static __attribute__((noinline)) __u32
+extract_domain(struct __sk_buff *skb, __u32 dns_payload_offset,
+               char *out, __u32 out_len)
+{
+    __u32 off = dns_payload_offset + 12;
+    __u32 pos = 0;
+    __u32 i;
+
+    for (i = 0; i < 32; i++) {
+        __u32 label_len = 0;
+        if (off > 0xFFFF) break;
+        if (bpf_skb_load_bytes(skb, off, &label_len, 1) < 0) break;
+        off++;
+        if (label_len == 0) break;
+        if ((label_len & 0xC0) == 0xC0) break;
+        if (label_len > 63) break;
+        if (pos > 0 && pos < out_len - 1) out[pos++] = '.';
+        /* Clamp off to ≤ 511 before the call so the verifier enters copy_label
+         * with a compact scalar range for the `off` argument.  Without this,
+         * the verifier tracks off up to 0xFFFF, producing byte_off ranges too
+         * wide to merge at the inner loop back-edge (max_states_per_insn=41). */
+        if (off > 511) break;
+        pos = copy_label(skb, off, pos);
+        if (pos >= AEGIS_MAX_DOMAIN_LEN) pos = AEGIS_MAX_DOMAIN_LEN - 1;
+        off += label_len;
+        if (off > 0xFFFF) break;
+    }
+    if (pos < out_len) out[pos] = '\0';
+    return pos;
+}
+
+/* ── HELPER: Check block map and return action ───────────────────────────── */
+static __always_inline __u8
+check_block_map(const char *domain)
+{
+    /* Use per-CPU scratch to avoid placing 256-byte key on the BPF stack */
+    __u32 zero = 0;
+    struct aegis_block_key *key = bpf_map_lookup_elem(&aegis_key_scratch, &zero);
+    if (!key)
+        return AEGIS_ACTION_PASS;
+
+    __builtin_memset(key->domain, 0, sizeof(key->domain));
+
+    /* Safe copy — BPF verifier requires bounded copies */
+    bpf_probe_read_kernel_str(key->domain, sizeof(key->domain), domain);
+
+    struct aegis_block_val *val = bpf_map_lookup_elem(&aegis_blocks, key);
+    if (val) {
+        /* Atomically increment hit count */
+        __sync_fetch_and_add(&val->hit_count, 1);
+        return val->action;
+    }
+
+    return AEGIS_ACTION_PASS;
+}
+
+/* ── HELPER: Emit event to ring buffer ───────────────────────────────────── */
+static __always_inline void
+emit_event(const char *domain, __u8 action, __u8 protocol, __u16 qtype)
+{
+    struct aegis_dns_event *event;
+
+    event = bpf_ringbuf_reserve(&aegis_events, sizeof(*event), 0);
+    if (!event)
+        return; /* Ring buffer full — drop event, NEVER drop packets */
+
+    event->pid          = bpf_get_current_pid_tgid() >> 32;
+    event->uid          = bpf_get_current_uid_gid() & 0xFFFFFFFF;
+    event->action       = action;
+    event->protocol     = protocol;
+    event->query_type   = qtype;
+    event->timestamp_ns = bpf_ktime_get_ns();
+    bpf_get_current_comm(event->comm, sizeof(event->comm));
+    bpf_probe_read_kernel_str(event->domain, sizeof(event->domain), domain);
+
+    bpf_ringbuf_submit(event, 0);
+}
+
+/* ── HOOK: cgroup/skb — fires on every socket packet in the cgroup ───────── */
+/*                                                                            */
+/* This is the main intercept point. Runs for ALL processes in the cgroup.   */
+/* Return 1 = allow packet, Return 0 = drop packet.                         */
+/*                                                                            */
+/* INVARIANT: On any parse error, ALWAYS return 1 (pass). Dropping           */
+/* legitimate traffic is worse than letting a threat through.                */
+SEC("cgroup_skb/egress")
+int aegis_dns_intercept(struct __sk_buff *skb)
+{
+    void *data     = (void *)(long)skb->data;
+    void *data_end = (void *)(long)skb->data_end;
+
+    /* ── Update per-CPU stats ────────────────────────────────────────────── */
+    __u32 stats_key = 0;
+    struct aegis_stats *stats = bpf_map_lookup_elem(&aegis_stats_map, &stats_key);
+    if (stats)
+        __sync_fetch_and_add(&stats->total_intercepted, 1);
+
+    /* ── Only process IP packets ─────────────────────────────────────────── */
+    /* Check the EtherType / protocol field from the skb                     */
+    __u8  protocol      = 0;
+    __u32 dns_offset    = 0;
+    __u16 dest_port     = 0;
+
+    /* ── Parse IPv4 headers ──────────────────────────────────────────────── */
+    struct iphdr *iph = data;
+    if ((void *)(iph + 1) > data_end)
+        return 1; /* Can't parse — pass through safely */
+
+    /* Only handle IPv4 for now (IPv6 support in Phase 14-B) */
+    if (iph->version != 4)
+        return 1;
+
+    /* Validate IHL — minimum 5 (20 bytes), maximum 15 (60 bytes) */
+    if (iph->ihl < 5 || iph->ihl > 15)
+        return 1;
+
+    /* Validate full IP header fits in packet */
+    if ((void *)iph + (iph->ihl * 4) > data_end)
+        return 1;
+
+    if (iph->protocol == IPPROTO_UDP) {
+        /* ── UDP DNS (most common) ───────────────────────────────────────── */
+        struct udphdr *udph = (void *)iph + (iph->ihl * 4);
+        if ((void *)(udph + 1) > data_end)
+            return 1;
+
+        dest_port = bpf_ntohs(udph->dest);
+        if (dest_port != 53)
+            return 1; /* Not DNS — pass through */
+
+        dns_offset = (void *)udph - data + sizeof(*udph);
+        protocol   = 0; /* UDP */
+
+    } else if (iph->protocol == IPPROTO_TCP) {
+        /* ── TCP DNS ─────────────────────────────────────────────────────── */
+        struct tcphdr *tcph = (void *)iph + (iph->ihl * 4);
+        if ((void *)(tcph + 1) > data_end)
+            return 1;
+
+        dest_port = bpf_ntohs(tcph->dest);
+        if (dest_port != 53)
+            return 1; /* Not DNS — pass through */
+
+        /* TCP DNS has a 2-byte length prefix before the DNS message */
+        dns_offset = (void *)tcph - data + (tcph->doff * 4) + 2;
+        protocol   = 1; /* TCP */
+
+    } else {
+        return 1; /* Not UDP or TCP — pass through */
+    }
+
+    /* ── Extract domain name from DNS wire format ────────────────────────── */
+    /* Use per-CPU scratch buffer to avoid placing 256 bytes on the BPF stack */
+    __u32 scratch_zero = 0;
+    struct aegis_domain_buf *scratch = bpf_map_lookup_elem(&aegis_domain_scratch, &scratch_zero);
+    if (!scratch)
+        return 1;
+
+    __builtin_memset(scratch->domain, 0, sizeof(scratch->domain));
+    __u32 domain_len = extract_domain(skb, dns_offset,
+                                      scratch->domain, sizeof(scratch->domain));
+    if (domain_len == 0)
+        return 1; /* Couldn't parse — pass through safely */
+
+    /* ── Extract DNS query type (A, AAAA, etc.) ──────────────────────────── */
+    /* QType is 2 bytes after the domain name's terminating zero             */
+    __u16 qtype = 0;
+    {
+        __u32 qtype_off = dns_offset + 12 + domain_len + 1;
+        if (qtype_off <= 0xFFFF) {
+            __u8 qtype_bytes[2] = {0, 0};
+            if (bpf_skb_load_bytes(skb, qtype_off, qtype_bytes, 2) == 0)
+                qtype = ((__u16)qtype_bytes[0] << 8) | qtype_bytes[1];
+        }
+    }
+
+    /* ── Check block map ─────────────────────────────────────────────────── */
+    __u8 action = check_block_map(scratch->domain);
+
+    /* ── Emit event to ring buffer regardless of action ──────────────────── */
+    emit_event(scratch->domain, action, protocol, qtype);
+
+    /* ── Apply the decision ──────────────────────────────────────────────── */
+    if (action == AEGIS_ACTION_BLOCK) {
+        if (stats)
+            __sync_fetch_and_add(&stats->total_blocked, 1);
+        return 0; /* DROP the packet — DNS query never reaches upstream */
+    }
+
+    if (stats)
+        __sync_fetch_and_add(&stats->total_passed, 1);
+
+    return 1; /* PASS — allow the DNS query through */
+}
+</file>
+
+<file path="kernel/aegisdns.bpf.h">
+/* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * aegisdns.bpf.h — Shared data structures for the AegisDNS eBPF kernel program.
+ *
+ * These structs are shared between the kernel-space eBPF program (C) and the
+ * userspace loader (C# via P/Invoke). All structs MUST use fixed-width types
+ * and #pragma pack(1) to ensure byte-for-byte layout compatibility.
+ *
+ * Copyright (c) 2026 AegisDNS. All rights reserved.
+ */
+
+#pragma once
+
+#ifdef __VMLINUX_H__
+/* BPF kernel context: vmlinux.h already provides all type definitions.
+ * Do not re-include linux/types.h (causes redefinition errors) and do not
+ * apply pack(1) (causes unaligned field access in kernel structs). */
+#else
+/* Userspace context: include types and apply pack(1) for C#/.NET interop. */
+#pragma pack(push, 1)
+#include <linux/types.h>
+#endif
+
+/* ── Constants ─────────────────────────────────────────────────────────────── */
+
+/* Maximum domain name length we'll inspect (capped at 64 for verifier safety) */
+#define AEGIS_MAX_DOMAIN_LEN 64
+
+/* Actions the kernel program can take on a DNS packet */
+#define AEGIS_ACTION_PASS    0   /* Allow the query through                  */
+#define AEGIS_ACTION_BLOCK   1   /* Drop the packet                          */
+#define AEGIS_ACTION_MONITOR 2   /* Pass but flag for AI analysis             */
+
+/* ── Ring Buffer Event ─────────────────────────────────────────────────────── */
+
+/*
+ * Event sent from kernel to userspace via ring buffer every time a DNS query
+ * is intercepted. Userspace reads these to feed into the AegisDNS engine.
+ */
+struct aegis_dns_event {
+    __u32 pid;                          /* PID of the process making the query  */
+    __u32 uid;                          /* UID of the process                   */
+    __u8  action;                       /* AEGIS_ACTION_PASS/BLOCK/MONITOR      */
+    __u8  protocol;                     /* 0 = UDP, 1 = TCP                     */
+    __u16 query_type;                   /* DNS record type (A=1, AAAA=28, etc.) */
+    __u64 timestamp_ns;                 /* ktime_get_ns() at intercept time     */
+    char  domain[AEGIS_MAX_DOMAIN_LEN]; /* Queried domain (null-terminated)     */
+    char  comm[16];                     /* Process name (task_comm from kernel)  */
+};
+
+/* ── Block Decision Hash Map Structures ────────────────────────────────────── */
+
+/*
+ * Key for the block decision hash map.
+ * Userspace (.NET) writes entries here, kernel reads them.
+ */
+struct aegis_block_key {
+    char domain[AEGIS_MAX_DOMAIN_LEN];
+};
+
+/*
+ * Value for the block decision hash map.
+ */
+struct aegis_block_val {
+    __u8  action;       /* AEGIS_ACTION_BLOCK or AEGIS_ACTION_MONITOR          */
+    __u64 block_time;   /* Timestamp when block was added (for TTL enforcement) */
+    __u32 hit_count;    /* How many times this block has been triggered         */
+};
+
+#ifndef __VMLINUX_H__
+#pragma pack(pop)
+#endif
+</file>
+
+</files>

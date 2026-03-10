@@ -1,0 +1,2236 @@
+This file is a merged representation of a subset of the codebase, containing specifically included files, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Only files matching these patterns are included: src/AegisDNS.Service/Src/**, src/AegisDNS.Core/Core/Engine.cs, src/AegisDNS.Core/Utilities/BootManager.cs, src/AegisDNS.Core/Utilities/TelemetryBlocker.cs
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+src/
+  AegisDNS.Core/
+    Core/
+      Engine.cs
+    Utilities/
+      BootManager.cs
+      TelemetryBlocker.cs
+  AegisDNS.Service/
+    Src/
+      AiSentinelWorker.cs
+      Program.cs
+      TamperMonitor.cs
+      WeeklyReportWorker.cs
+      Worker.cs
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="src/AegisDNS.Core/Utilities/BootManager.cs">
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
+
+namespace AegisDNS.Core;
+
+/// Manages AegisDNS auto-start on boot.
+/// Linux: writes/removes a systemd user service or XDG autostart entry.
+/// </summary>
+public static class BootManager
+{
+    private const string AppName = "aegisdns-ui";
+
+    // XDG autostart — works on all Linux DEs (GNOME, KDE, XFCE, etc.)
+    private static string XdgAutostartDir =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                     ".config", "autostart");
+
+    private static string XdgAutostartFile =>
+        Path.Combine(XdgAutostartDir, "aegisdns.desktop");
+
+    public static void SetStartup(bool enable)
+    {
+        SetStartupLinux(enable);
+    }
+
+    public static bool IsStartupEnabled()
+    {
+        return File.Exists(XdgAutostartFile);
+    }
+
+    private static void SetStartupLinux(bool enable)
+    {
+        try
+        {
+            if (enable)
+            {
+                Directory.CreateDirectory(XdgAutostartDir);
+                string exePath = Environment.ProcessPath ?? "/opt/AegisDNS/AegisDNSUI";
+                string desktop = $"""
+[Desktop Entry]
+Type=Application
+Name=AegisDNS
+Exec={exePath}{(ConfigManager.Settings.StartMinimized ? " --minimized" : "")}
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Comment=AegisDNS DNS Privacy Shield — auto-start
+""";
+                File.WriteAllText(XdgAutostartFile, desktop);
+            }
+            else
+            {
+                if (File.Exists(XdgAutostartFile))
+                    File.Delete(XdgAutostartFile);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[BootManager] Autostart error: {ex.Message}");
+        }
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Core/Utilities/TelemetryBlocker.cs">
+using System;
+using System.Diagnostics;
+
+namespace AegisDNS.Core.Utilities;
+
+/// <summary>
+/// Blocks telemetry at the DNS level by adding known telemetry domains to the blocklist.
+/// Works on all platforms via the existing BlocklistManager — no OS-specific code needed.
+/// </summary>
+public static class TelemetryBlocker
+{
+    // Well-known telemetry domains across common software vendors
+    private static readonly string[] TelemetryDomains =
+    [
+        // Microsoft
+        "telemetry.microsoft.com",
+        "vortex.data.microsoft.com",
+        "settings-win.data.microsoft.com",
+        "watson.telemetry.microsoft.com",
+        "oca.telemetry.microsoft.com",
+        "telecommand.telemetry.microsoft.com",
+        "sqm.telemetry.microsoft.com",
+        // Google
+        "clients4.google.com",
+        "update.googleapis.com",
+        "safebrowsing.googleapis.com",
+        // Apple
+        "metrics.icloud.com",
+        "xp.apple.com",
+        // Common analytics
+        "analytics.google.com",
+        "www.google-analytics.com",
+        "segment.io",
+        "api.segment.io",
+        "mixpanel.com",
+        "api.mixpanel.com",
+        "amplitude.com",
+        "api.amplitude.com",
+        "hotjar.com",
+        "static.hotjar.com",
+        // Advertising
+        "doubleclick.net",
+        "googlesyndication.com",
+        "googleadservices.com",
+        "facebook.com/tr",
+        "connect.facebook.net",
+    ];
+
+    public static void ApplyBlocking(bool enable)
+    {
+        if (!ConfigManager.Settings.TelemetryOptIn && enable)
+        {
+            Debug.WriteLine("[TelemetryBlocker] Skipped: user has not opted in.");
+            return;
+        }
+
+        try
+        {
+            foreach (var domain in TelemetryDomains)
+            {
+                if (enable)
+                    AiLearnedBlocklist.Add(domain);
+                else
+                    AiLearnedBlocklist.Remove(domain);
+            }
+            Debug.WriteLine(enable ? "[TelemetryBlocker] Domains blocked." : "[TelemetryBlocker] Domains unblocked.");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[TelemetryBlocker] Error: {ex.Message}");
+        }
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Service/Src/AiSentinelWorker.cs">
+using AegisDNS.Core;
+using AegisDNS.Core.Ai;
+using AegisDNS.Core.Monitoring;
+
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+namespace AegisDNS.Service.Src;
+
+public class AiSentinelWorker : BackgroundService
+{
+    private readonly AegisEngine _engine;
+    private readonly ILogger<AiSentinelWorker> _logger;
+    private readonly IAiProviderFactory _aiFactory;
+
+    public AiSentinelWorker(AegisEngine engine, ILogger<AiSentinelWorker> logger)
+    {
+        _engine = engine;
+        _logger = logger;
+        _aiFactory = new AiProviderFactory();
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        // Wait for engine startup before first scan
+        await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                if (AiConfigManager.Settings.EnableAiSentinel && _engine.IsRunning)
+                {
+                    var history = _engine.GetHistory();
+
+                    if (history.Count > 0)
+                    {
+                        var provider = _aiFactory.GetProviderWithFallback(AiConfigManager.Settings);
+                        if (provider != null)
+                        {
+                            var result = await provider.AnalyzeAsync(history, AiConfigManager.Settings);
+
+                            if (result != null)
+                            {
+                                if (result.Contains("THREAT", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    await IpcSystem.BroadcastLogAsync($"🧠 AI SENTINEL: {result}");
+                                }
+                                else
+                                {
+                                    _logger.LogDebug("[AiSentinel] Scan clean: {Result}", result);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[AiSentinel] Error.");
+                // Don't broadcast errors to UI — AI is optional, failures shouldn't alarm the user
+            }
+
+            await Task.Delay(TimeSpan.FromMinutes(AiConfigManager.Settings.AiCheckIntervalMinutes), stoppingToken);
+        }
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Service/Src/TamperMonitor.cs">
+using System;
+using System.Diagnostics;
+using System.Linq;
+using System.Net.NetworkInformation;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+
+using AegisDNS.BpfLoader;
+using AegisDNS.Core;
+using AegisDNS.XdpLoader;
+
+namespace AegisDNS.Service.Src;
+
+public class TamperMonitor
+{
+    private readonly AegisEngine _engine;
+    private readonly Action<string> _broadcastAction;
+    private CancellationTokenSource? _cts;
+
+    public TamperMonitor(AegisEngine engine, Action<string> broadcastAction)
+    {
+        _engine = engine;
+        _broadcastAction = broadcastAction;
+    }
+
+    public void Start()
+    {
+        if (_cts != null) return;
+        _cts = new CancellationTokenSource();
+
+        // Linux/Other: Use polling (WMI not available)
+        Task.Run(() => MonitorLoop(_cts.Token), _cts.Token);
+    }
+
+    public void Stop()
+    {
+        _cts?.Cancel();
+        _cts = null;
+    }
+
+    private async Task MonitorLoop(CancellationToken token)
+    {
+        while (!token.IsCancellationRequested)
+        {
+            if (_engine.IsRunning)
+            {
+                CheckAndRepair();
+                CheckBpfAttachment();
+                CheckXdpAttachment();
+            }
+            await Task.Delay(5000, token); // Check every 5 seconds
+        }
+    }
+
+    private void CheckAndRepair()
+    {
+        // Native Linux doesn't easily tampered like Windows System DNS since we use resolvectl
+        // but we keep the stub if we switch back to tracking /etc/resolv.conf manually
+    }
+
+    private string DetectActiveInterface()
+    {
+        if (DnsConfigManager.Settings.PreferredAdapter != "Auto-Detect")
+            return DnsConfigManager.Settings.PreferredAdapter;
+
+        var active = NetworkInterface.GetAllNetworkInterfaces()
+            .FirstOrDefault(ni => ni.OperationalStatus == OperationalStatus.Up &&
+                                  ni.GetIPProperties().GatewayAddresses.Count > 0 &&
+                                  ni.NetworkInterfaceType != NetworkInterfaceType.Loopback);
+
+        return active?.Name ?? string.Empty;
+    }
+
+    private void RestoreLoopback(string interfaceName)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo("resolvectl")
+            {
+                CreateNoWindow = true,
+                UseShellExecute = false
+            };
+            psi.ArgumentList.Add("dns");
+            psi.ArgumentList.Add(interfaceName);
+            psi.ArgumentList.Add("127.0.0.1");
+            Process.Start(psi)?.WaitForExit();
+        }
+        catch (Exception ex)
+        {
+            _broadcastAction($"⚠️ Restoration Failed: {ex.Message}");
+        }
+    }
+
+    private void CheckBpfAttachment()
+    {
+
+        // Only check if BPF was successfully loaded on startup
+        if (!AegisBpfLoader.WasLoaded) return;
+
+        if (!AegisBpfLoader.IsAttached())
+        {
+            _broadcastAction("🚨 TAMPER DETECTED: eBPF kernel hook was detached! Reattaching...");
+
+            // Attempt to reattach
+            bool reattached = AegisBpfLoader.Reattach();
+            if (reattached)
+                _broadcastAction("🛡️ eBPF kernel hook reattached successfully");
+            else
+                _broadcastAction("❌ eBPF reattach failed — falling back to iptables redirect");
+        }
+    }
+
+    private void CheckXdpAttachment()
+    {
+
+        // Only check if XDP was successfully loaded
+        if (!AegisXdpLoader.WasLoaded) return;
+
+        if (!AegisXdpLoader.IsAttached())
+        {
+            _broadcastAction("🚨 TAMPER DETECTED: XDP ingress hook was detached! Reattaching...");
+
+            bool reattached = AegisXdpLoader.Reattach();
+            if (reattached)
+                _broadcastAction("🛡️ XDP ingress hook reattached successfully");
+            else
+                _broadcastAction("❌ XDP reattach failed — eBPF egress protection remains active");
+        }
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Service/Src/WeeklyReportWorker.cs">
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+
+using AegisDNS.Core;
+using AegisDNS.Core.Ai;
+using AegisDNS.Core.Utilities;
+
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+namespace AegisDNS.Service.Src;
+
+public class WeeklyReportWorker : BackgroundService
+{
+    private readonly ILogger<WeeklyReportWorker> _logger;
+    private DateOnly _lastReported = DateOnly.MinValue;
+
+    public WeeklyReportWorker(ILogger<WeeklyReportWorker> logger)
+    {
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                var now = DateTime.Now;
+                // e.g. Sunday 8 PM
+                if (now.DayOfWeek == DayOfWeek.Sunday && now.Hour == 20)
+                {
+                    var today = DateOnly.FromDateTime(DateTime.Now);
+                    if (_lastReported == today)
+                    {
+                        await Task.Delay(TimeSpan.FromMinutes(10), stoppingToken);
+                        continue;
+                    }
+                    _lastReported = today;
+
+                    // Basic debounce using Task.Delay so it only runs once in that hour
+                    var topBlocked = TopDomainsTracker.GetTopBlocked().Select(k => k.Domain).Take(10);
+                    var topAllowed = TopDomainsTracker.GetTopAllowed().Select(k => k.Domain).Take(10);
+
+                    if (topBlocked.Any() || topAllowed.Any())
+                    {
+                        await AiReportsManager.GenerateWeeklyReportAsync(topBlocked, topAllowed);
+                    }
+
+                    await Task.Delay(TimeSpan.FromHours(1), stoppingToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[WeeklyReportWorker] Error.");
+            }
+
+            // Check every 10 minutes
+            await Task.Delay(TimeSpan.FromMinutes(10), stoppingToken);
+        }
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Service/Src/Program.cs">
+using System;
+using System.Diagnostics;
+using System.Threading.Tasks;
+
+using AegisDNS.Core;
+using AegisDNS.Core.Ai;
+using AegisDNS.Core.Utilities;
+using AegisDNS.Service.Src; // Need this for Debug.WriteLine
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+
+namespace AegisDNS.Service;
+
+// Pre-host bootstrap class — DI not yet available. Log() wraps Debug.WriteLine + Console.WriteLine intentionally.
+public class Program
+{
+    public static void Main(string[] args)
+    {
+        // SAFE LOGGING: Writes to Console if possible, otherwise to VS Output
+        Log("==========================================");
+        Log("   🔥 AEGIS SERVICE LAUNCHING... 🔥       ");
+        Log("==========================================");
+
+        // --- INSTALLER COMMAND HOOKS ---
+        if (args.Length > 0 && args[0] == "--install-snapshot")
+        {
+            Log("Creating pre-install DNS snapshot...");
+            try
+            {
+                var active = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+                    .FirstOrDefault(ni => ni.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up &&
+                                          ni.GetIPProperties().GatewayAddresses.Count > 0 &&
+                                          ni.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback);
+
+                if (active != null)
+                {
+                    var dnsAddresses = active.GetIPProperties().DnsAddresses;
+                    var dns = dnsAddresses.Select(a => a.ToString()).ToList();
+
+                    // DHCP detection: Primary and Secondary 0.0.0.0 or Empty list
+                    bool wasDhcp = dns.Count == 0 || dns.All(d => d == "0.0.0.0");
+
+                    if (!DnsSnapshot.Exists())
+                    {
+                        DnsSnapshot.Save(dns, wasDhcp, active.Name);
+                        Log($"Snapshot saved for ({active.Name})");
+                    }
+                    else
+                    {
+                        Log("Snapshot already exists. Keeping original.");
+                    }
+                }
+                Environment.Exit(0);
+            }
+            catch (Exception ex)
+            {
+                Log($"Failed to create snapshot: {ex.Message}");
+                Environment.Exit(1);
+            }
+            return;
+        }
+
+        if (args.Length > 0 && args[0] == "--uninstall-restore")
+        {
+            Log("Restoring DNS settings before uninstall...");
+            try
+            {
+                AegisEngine.RestoreSystemDns();
+                Log("DNS restored successfully.");
+                Environment.Exit(0);
+            }
+            catch (Exception ex)
+            {
+                Log($"Failed to restore DNS: {ex.Message}");
+                Environment.Exit(1);
+            }
+            return;
+        }
+
+        // ------------------------------------------------------------
+        // ROLLBACK HEALTH CHECK
+        // ------------------------------------------------------------
+        if (!AegisDNS.Core.Utilities.RollbackManager.RunHealthCheck())
+        {
+            Log("[CRITICAL] Health check failed on startup. Initiating rollback...");
+            AegisDNS.Core.Utilities.RollbackManager.Restore();
+            Environment.Exit(1);
+            return;
+        }
+
+        // ── BOOT INTEGRITY ENFORCEMENT (Phase 8 — B.1) ──────────────────────────
+        // Verify all binaries match the signed integrity manifest.
+        // Exit(10) signals installer/monitor: tampered binary detected.
+        // If the manifest files are absent this is treated as a dev/unsigned build —
+        // log a warning and continue rather than refusing to start.
+        string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        string manifestPath    = Path.Combine(baseDir, "integrity.manifest");
+        string manifestSigPath = Path.Combine(baseDir, "integrity.manifest.sig");
+
+        if (!File.Exists(manifestPath) || !File.Exists(manifestSigPath))
+        {
+            Log("[WARNING] integrity.manifest / integrity.manifest.sig not found — " +
+                "skipping boot integrity check (dev or unsigned build).");
+        }
+        else
+        {
+            try
+            {
+                bool integrityOk = AegisDNS.Core.Security.IntegrityChecker.VerifyEnvironmentAsync()
+                    .GetAwaiter().GetResult();
+                if (!integrityOk)
+                {
+                    Log("[CRITICAL] Boot integrity check FAILED. Binary may be tampered. Exiting.");
+                    Environment.Exit(10);
+                    return;
+                }
+                Log("[OK] Boot integrity verified.");
+            }
+            catch (Exception ex)
+            {
+                Log($"[CRITICAL] Boot integrity check threw: {ex.Message}. Exiting.");
+                Environment.Exit(10);
+                return;
+            }
+        }
+        // ── END BOOT INTEGRITY ───────────────────────────────────────────────────
+
+        // ------------------------------------------------------------
+        // HARDENING PHASE: LICENSE CHECK
+        // ------------------------------------------------------------
+        try
+        {
+            string? rawLicense = ResolveLicenseKey(args);
+
+            AegisDNS.Licensing.LicenseManager.EnsureActivated(rawLicense);
+
+            if (!AegisDNS.Licensing.LicenseManager.IsLicenseValid())
+            {
+                string msg = "[WARNING]: License validation failed (RSA Signature / HWID Mismatch). Downgrading to Community Tier. Core protection remains active.";
+                Log(msg);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"[CRITICAL]: License check crashed: {ex.Message}");
+            // Still allow it to run - we fail open
+        }
+        // ------------------------------------------------------------
+
+        try
+        {
+            CreateHostBuilder(args).Build().Run();
+        }
+        catch (Exception ex)
+        {
+            Log($"[CRITICAL FAILURE]: {ex.Message}");
+            if (Environment.UserInteractive)
+            {
+                try { Console.ReadLine(); } catch { }
+            }
+        }
+    }
+
+    // Helper to print logs without crashing if there is no window
+    static void Log(string message)
+    {
+        // 1. Try writing to the VS Debug Output (Always works)
+        Debug.WriteLine(message);
+
+        // 2. Try writing to Console (Might fail if running as Service)
+        try
+        {
+            // Do NOT set Console.Title - that causes the crash!
+            Console.WriteLine(message); // Changed to Console.WriteLine
+        }
+        catch { /* Ignore if no console exists */ }
+    }
+
+    private static string? ResolveLicenseKey(string[] args)
+    {
+        string licenseFilePath = GetLicenseKeyPath();
+        string? fileLicense = TryReadLicenseKeyFromFile(licenseFilePath);
+        if (!string.IsNullOrWhiteSpace(fileLicense))
+        {
+            Log($"License key loaded from {licenseFilePath}.");
+            return fileLicense;
+        }
+
+        string? argLicense = TryGetLicenseKeyFromArgs(args);
+        if (!string.IsNullOrWhiteSpace(argLicense))
+        {
+            Log("License key loaded from --license-key argument.");
+            return argLicense;
+        }
+
+        Log("No license key found — running in trial/free mode");
+        return null;
+    }
+
+    private static string GetLicenseKeyPath()
+    {
+        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        return Path.Combine(home, ".config", "aegisdns", "license.key");
+    }
+
+    private static string? TryReadLicenseKeyFromFile(string licenseFilePath)
+    {
+        if (!File.Exists(licenseFilePath))
+        {
+            return null;
+        }
+
+        EnsureLicenseFilePermissionsAre600(licenseFilePath);
+
+        try
+        {
+            // Treat as a single-line secret. If multiple lines exist, we only use the first line.
+            string[] lines = File.ReadAllLines(licenseFilePath);
+            if (lines.Length == 0)
+            {
+                return null;
+            }
+
+            string firstLine = lines[0].Trim();
+            return string.IsNullOrWhiteSpace(firstLine) ? null : firstLine;
+        }
+        catch (IOException ex)
+        {
+            Log($"[WARNING] Failed to read license file '{licenseFilePath}': {ex.Message}");
+            return null;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Log($"[WARNING] Access denied reading license file '{licenseFilePath}': {ex.Message}");
+            return null;
+        }
+    }
+
+    private static void EnsureLicenseFilePermissionsAre600(string licenseFilePath)
+    {
+        try
+        {
+            UnixFileMode mode = File.GetUnixFileMode(licenseFilePath);
+            UnixFileMode secureMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+
+            if (mode != secureMode)
+            {
+                int octalMode = ((int)mode) & 0xFFF;
+                string modeText = Convert.ToString(octalMode, 8).PadLeft(3, '0');
+                Log($"[WARNING] License key file permissions are {modeText}. Expected 600; attempting to fix.");
+
+                try
+                {
+                    File.SetUnixFileMode(licenseFilePath, secureMode);
+                    Log("License key file permissions set to 600.");
+                }
+                catch (IOException ex)
+                {
+                    Log($"[WARNING] Failed to set permissions to 600 for '{licenseFilePath}': {ex.Message}");
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    Log($"[WARNING] Failed to set permissions to 600 for '{licenseFilePath}': {ex.Message}");
+                }
+            }
+        }
+        catch (IOException ex)
+        {
+            Log($"[WARNING] Could not verify permissions on '{licenseFilePath}': {ex.Message}");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Log($"[WARNING] Could not verify permissions on '{licenseFilePath}': {ex.Message}");
+        }
+        catch (PlatformNotSupportedException)
+        {
+            // Linux is the only supported platform, but keep this non-fatal.
+        }
+    }
+
+    private static string? TryGetLicenseKeyFromArgs(string[] args)
+    {
+        for (int i = 0; i < args.Length; i++)
+        {
+            string arg = args[i];
+            if (arg.Equals("--license-key", StringComparison.Ordinal))
+            {
+                if (i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal))
+                {
+                    Log("[WARNING] --license-key was provided without a value.");
+                    return null;
+                }
+
+                string value = args[i + 1].Trim();
+                return string.IsNullOrWhiteSpace(value) ? null : value;
+            }
+
+            if (arg.StartsWith("--license-key=", StringComparison.Ordinal))
+            {
+                string value = arg["--license-key=".Length..].Trim();
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    Log("[WARNING] --license-key was provided without a value.");
+                    return null;
+                }
+
+                return value;
+            }
+        }
+
+        return null;
+    }
+
+    // Added CreateHostBuilder method
+    public static IHostBuilder CreateHostBuilder(string[] args) =>
+        Host.CreateDefaultBuilder(args)
+            .UseSystemd()
+            .ConfigureServices((hostContext, services) =>
+            {
+                services.AddSingleton<AegisEngine>();
+                // Update Engine (Phase 5)
+                services.AddSingleton<UpdateManager>();
+                // Plugin Architecture (Phase 6)
+                services.AddSingleton<PluginManager>();
+
+                // Worker: The main background loop
+                services.AddHostedService<Worker>();
+                // AiSentinel: The AI analysis worker
+                services.AddHostedService<AiSentinelWorker>();
+                services.AddHostedService<WeeklyReportWorker>();
+            });
+}
+</file>
+
+<file path="src/AegisDNS.Service/Src/Worker.cs">
+using System;
+using System.IO;
+using System.Runtime.Versioning;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+
+using AegisDNS.BpfLoader;
+using AegisDNS.Core;
+using AegisDNS.Core.ExtensionApi;
+using AegisDNS.Core.Monitoring;
+using AegisDNS.Core.PolicyEngine;
+using AegisDNS.Core.Utilities;
+using AegisDNS.Licensing;
+using AegisDNS.WebDashboard;
+using AegisDNS.XdpLoader;
+
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+namespace AegisDNS.Service.Src;
+
+[SupportedOSPlatform("linux")]
+public class Worker : BackgroundService
+{
+    private readonly ILogger<Worker> _logger;
+    private readonly ILoggerFactory _loggerFactory;
+    private readonly AegisEngine _engine;
+    private readonly TamperMonitor _tamperMonitor;
+    private readonly UpdateManager _updateManager;
+    private readonly PluginManager _pluginManager;
+    private readonly System.Timers.Timer _metricsTimer;
+    private WebDashboardHost? _webDashboard;
+    private DevicePolicyEngine? _policyEngine;
+    private ExtensionApiHost? _extensionApi;
+    private LatencyMonitor? _latencyMonitor;
+    private AegisDNS.Core.Proxy.HttpsProxyHost? _proxyHost;
+    /// <summary>Long-lived HttpClient dedicated to cloud sync background tasks (non-hot-path).</summary>
+    private readonly System.Net.Http.HttpClient _cloudClient = new();
+
+    public Worker(ILogger<Worker> logger, ILoggerFactory loggerFactory, AegisEngine engine, UpdateManager updateManager, PluginManager pluginManager)
+    {
+        _logger = logger;
+        _loggerFactory = loggerFactory;
+        _engine = engine;
+        _updateManager = updateManager;
+        _pluginManager = pluginManager;
+
+        // Setup Tamper Monitor to broadcast logs
+        _tamperMonitor = new TamperMonitor(engine, async (msg) => await IpcSystem.BroadcastLogAsync(msg));
+
+        // Wire up Engine logs to UI
+        _engine.LogReceived += async (msg) => await IpcSystem.BroadcastLogAsync(msg);
+
+        // Setup Metrics Snapshot Timer (5 mins)
+        _metricsTimer = new System.Timers.Timer(TimeSpan.FromMinutes(5).TotalMilliseconds);
+        _metricsTimer.Elapsed += (s, e) => MetricsHistory.RecordSnapshot();
+        _metricsTimer.AutoReset = true;
+
+        // Phase 18 — Internet Survivability: ensure iptables cleanup on crash
+        AppDomain.CurrentDomain.ProcessExit += (s, e) => AegisDNS.Core.Proxy.TrafficRedirector.Disable();
+        AppDomain.CurrentDomain.UnhandledException += (s, e) => AegisDNS.Core.Proxy.TrafficRedirector.Disable();
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+
+        _logger.LogDebug("[Worker] Service starting");
+
+        // Force config managers to initialize NOW, before any background tasks can
+        // pre-empt them or throw. ConfigManager.AppFolder is already confirmed correct.
+        _ = DnsConfigManager.Settings;
+        _ = SecurityConfigManager.Settings;
+        _logger.LogInformation("[Worker] Config managers initialized: dns={DnsPath}, security={SecPath}",
+            System.IO.Path.Combine(ConfigManager.AppFolder, "dns.config.json"),
+            System.IO.Path.Combine(ConfigManager.AppFolder, "security.config.json"));
+
+        // 1. START IPC IMMEDIATELY (Critical Fix)
+        // This ensures the UI can connect instantly, even if download is slow.
+        var commandServer = IpcSystem.StartCommandServerAsync(OnIpcCommand, stoppingToken);
+        // Broadcast server is fire-and-forget: it waits for a UI client to connect and
+        // must never block or crash the Worker regardless of whether a client is present.
+        _ = Task.Run(() => IpcSystem.StartBroadcastServerAsync(stoppingToken));
+
+        _logger.LogDebug("[Worker] IPC server open, waiting for UI");
+
+        // 2. Run Startup Tasks in Background
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await IpcSystem.BroadcastLogAsync("⏳ Service initializing...");
+
+                if (!_engine.GetCurrentBlocklist().Any())
+                {
+                    await IpcSystem.BroadcastLogAsync("📥 Blocklist empty — downloading multi-source blocklists...");
+                    await _engine.UpdateBlocklistAsync();
+                }
+
+                // Initialize Plugins (Phase 6)
+                await _pluginManager.LoadPluginsAsync();
+
+                // Load historical metrics
+                MetricsHistory.Load();
+                _metricsTimer.Start();
+
+                // Apply Telemetry Blocking if enabled
+                if (BlocklistConfigManager.Settings.BlockTelemetry)
+                {
+                    TelemetryBlocker.ApplyBlocking(true);
+                }
+
+                // Phase 11 — Browser Extension API (all tiers)
+                if (RouterConfigManager.Settings.EnableExtensionApi)
+                {
+                    try
+                    {
+                        _extensionApi = new ExtensionApiHost(_engine, _loggerFactory.CreateLogger<ExtensionApiHost>());
+                        _extensionApi.Start(RouterConfigManager.Settings.ExtensionApiPort);
+                        _engine.Broadcast($"🌐 Extension API listening on port {RouterConfigManager.Settings.ExtensionApiPort}");
+                    }
+                    catch (Exception ex) { await IpcSystem.BroadcastLogAsync($"⚠️ Extension API failure: {ex.Message}"); }
+                }
+
+                // Phase 11 — Latency Monitor (all tiers)
+                if (DnsConfigManager.Settings.EnableLatencyMonitor)
+                {
+                    try
+                    {
+                        _latencyMonitor = new LatencyMonitor(_engine);
+                        _latencyMonitor.Start();
+                    }
+                    catch (Exception ex) { await IpcSystem.BroadcastLogAsync($"⚠️ Latency Monitor failure: {ex.Message}"); }
+                }
+
+                await IpcSystem.BroadcastLogAsync("⚙️ Service Ready. Click 'ACTIVATE' to start the shield.");
+
+                // Phase 16 — Policy engine (Enterprise only)
+                if (SecurityConfigManager.Settings.EnablePolicyEngine
+                    && (LicenseManager.CurrentTier >= LicenseManager.LicenseTier.Enterprise || LicenseManager.CurrentTier == LicenseManager.LicenseTier.Founder || LicenseManager.CurrentTier == LicenseManager.LicenseTier.Developer))
+                {
+                    try
+                    {
+                        _policyEngine = new DevicePolicyEngine(_loggerFactory.CreateLogger<DevicePolicyEngine>());
+                        _policyEngine.Initialize();
+                        await IpcSystem.BroadcastLogAsync("🛡️ Device Policy Engine initialized.");
+                    }
+                    catch (Exception ex) { await IpcSystem.BroadcastLogAsync($"⚠️ Policy Engine failure: {ex.Message}"); }
+                }
+
+                // Phase 16 — Web dashboard (Pro+ only)
+                if (SecurityConfigManager.Settings.EnableWebDashboard
+                    && LicenseManager.CurrentTier >= LicenseManager.LicenseTier.Pro)
+                {
+                    try
+                    {
+                        _webDashboard = new WebDashboardHost(_engine, _policyEngine ?? new DevicePolicyEngine(_loggerFactory.CreateLogger<DevicePolicyEngine>()), _loggerFactory.CreateLogger<WebDashboardHost>());
+                        await _webDashboard.StartAsync(SecurityConfigManager.Settings.WebDashboardPort, stoppingToken);
+                        _engine.Broadcast("🌐 Web dashboard active on port " + SecurityConfigManager.Settings.WebDashboardPort);
+                    }
+                    catch (Exception ex) { await IpcSystem.BroadcastLogAsync($"⚠️ Web Dashboard failure: {ex.Message}"); }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[Startup Error]");
+                await IpcSystem.BroadcastLogAsync($"❌ Error: {ex.Message}");
+            }
+        }, stoppingToken);
+
+        // 3. Start Auto-Update Background Loop (Phase 5)
+        _ = Task.Run(async () =>
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromHours(6), stoppingToken);
+                    var update = await _updateManager.CheckForUpdatesAsync();
+
+                    if (update != null)
+                    {
+                        await IpcSystem.BroadcastLogAsync($"🆕 Update Found: v{update.Version}");
+                        await IpcSystem.BroadcastLogAsync("⬇️ Downloading update...");
+                        if (await _updateManager.DownloadAndInstallAsync(update))
+                        {
+                            await IpcSystem.BroadcastLogAsync("✅ Update downloaded. Installing...");
+                            // Process will exit when installer runs
+                        }
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    return; // Service stopping — exit cleanly
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "[AutoUpdate] Error");
+                    // Wait before retrying to avoid tight error loop
+                    try { await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken); }
+                    catch (OperationCanceledException) { return; }
+                }
+            }
+        }, stoppingToken);
+
+        // 4. Phase 13 — Cloud Metrics Sync (every 15 minutes, non-fatal)
+        _ = Task.Run(async () =>
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromMinutes(15), stoppingToken);
+
+                    if (!SecurityConfigManager.Settings.CloudSyncEnabled
+                        || !ConfigManager.Settings.TelemetryOptIn
+                        || string.IsNullOrEmpty(SecurityConfigManager.Settings.DeviceApiToken))
+                        continue;
+
+                    var metrics = MetricsManager.Current;
+                    var payload = System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        totalQueries = metrics.TotalQueries,
+                        blockedQueries = metrics.BlockedQueries,
+                        cacheHits = metrics.CacheHits,
+                        upstreamLatencyMs = 0,
+                        recordedAt = DateTime.UtcNow
+                    });
+
+                    var client = _cloudClient;
+                    using var req = new System.Net.Http.HttpRequestMessage(
+                        System.Net.Http.HttpMethod.Post,
+                        $"{SecurityConfigManager.Settings.CloudApiEndpoint}/api/metrics/ingest");
+                    req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", SecurityConfigManager.Settings.DeviceApiToken);
+                    req.Content = new System.Net.Http.StringContent(
+                        payload, System.Text.Encoding.UTF8, "application/json");
+
+                    var response = await client.SendAsync(req, stoppingToken);
+                    if (response.IsSuccessStatusCode)
+                        _logger.LogInformation("[CloudSync] Metrics ingested");
+                    else
+                        _logger.LogWarning("[CloudSync] Metrics ingest returned {0}", response.StatusCode);
+                }
+                catch (OperationCanceledException) { break; }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning("[CloudSync:Metrics] Non-fatal error: {0}", ex.Message);
+                }
+            }
+        }, stoppingToken);
+
+        // 5. Phase 13 — Cloud Heartbeat + Policy Sync + Command Poll (every 60s, non-fatal)
+        _ = Task.Run(async () =>
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
+
+                    if (!SecurityConfigManager.Settings.CloudSyncEnabled
+                        || string.IsNullOrEmpty(SecurityConfigManager.Settings.DeviceApiToken))
+                        continue;
+
+                    var client = _cloudClient;
+
+                    // ── Heartbeat ─────────────────────────────────────────────
+                    using var hbReq = new System.Net.Http.HttpRequestMessage(
+                        System.Net.Http.HttpMethod.Post,
+                        $"{SecurityConfigManager.Settings.CloudApiEndpoint}/api/device/heartbeat");
+                    hbReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", SecurityConfigManager.Settings.DeviceApiToken);
+                    hbReq.Content = new System.Net.Http.StringContent(
+                        $"{{\"version\":\"1.0.0\",\"uptime\":0}}", System.Text.Encoding.UTF8, "application/json");
+
+                    var hbResp = await client.SendAsync(hbReq, stoppingToken);
+                    if (hbResp.IsSuccessStatusCode)
+                    {
+                        var hbJson = await hbResp.Content.ReadAsStringAsync(stoppingToken);
+                        using var hbDoc = System.Text.Json.JsonDocument.Parse(hbJson);
+                        int serverPolicyVersion = hbDoc.RootElement.GetProperty("policyVersion").GetInt32();
+
+                        // ── Policy Sync if version changed ────────────────────
+                        if (serverPolicyVersion > SecurityConfigManager.Settings.CloudPolicyVersion)
+                        {
+                            try
+                            {
+                                using var polReq = new System.Net.Http.HttpRequestMessage(
+                                    System.Net.Http.HttpMethod.Get,
+                                    $"{SecurityConfigManager.Settings.CloudApiEndpoint}/api/policy/current");
+                                polReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                                    "Bearer", SecurityConfigManager.Settings.DeviceApiToken);
+
+                                var polResp = await client.SendAsync(polReq, stoppingToken);
+                                if (polResp.IsSuccessStatusCode)
+                                {
+                                    var polJson = await polResp.Content.ReadAsStringAsync(stoppingToken);
+                                    using var polDoc = System.Text.Json.JsonDocument.Parse(polJson);
+                                    var rulesJson = polDoc.RootElement.GetProperty("rules").GetRawText();
+
+                                    // Apply atomically via DevicePolicyEngine
+                                    if (_policyEngine is not null)
+                                    {
+                                        _policyEngine.ApplyPolicy(rulesJson);
+                                        await IpcSystem.BroadcastLogAsync($"☁️ Cloud policy v{serverPolicyVersion} applied.");
+                                    }
+
+                                    // Cache policy locally
+                                    Directory.CreateDirectory(ConfigManager.AppFolder);
+                                    await File.WriteAllTextAsync(
+                                        Path.Combine(ConfigManager.AppFolder, "policy_cache.json"), polJson, stoppingToken);
+
+                                    SecurityConfigManager.Settings.CloudPolicyVersion = serverPolicyVersion;
+                                    SecurityConfigManager.Settings.CloudSyncFailureCount = 0;
+                                    SecurityConfigManager.Save();
+                                }
+                            }
+                            catch (Exception pex)
+                            {
+                                SecurityConfigManager.Settings.CloudSyncFailureCount++;
+                                SecurityConfigManager.Save();
+                                _logger.LogWarning("[CloudSync:Policy] Non-fatal fetch error: {0}", pex.Message);
+                                if (SecurityConfigManager.Settings.CloudSyncFailureCount >= 3)
+                                    await IpcSystem.BroadcastLogAsync("⚠️ Cloud policy sync failed 3 times. Using cached policy.");
+                            }
+                        }
+                    }
+
+                    // ── Command Poll ──────────────────────────────────────────
+                    using var cmdReq = new System.Net.Http.HttpRequestMessage(
+                        System.Net.Http.HttpMethod.Get,
+                        $"{SecurityConfigManager.Settings.CloudApiEndpoint}/api/command/pending");
+                    cmdReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", SecurityConfigManager.Settings.DeviceApiToken);
+
+                    var cmdResp = await client.SendAsync(cmdReq, stoppingToken);
+                    if (cmdResp.IsSuccessStatusCode)
+                    {
+                        var cmdJson = await cmdResp.Content.ReadAsStringAsync(stoppingToken);
+                        using var cmdDoc = System.Text.Json.JsonDocument.Parse(cmdJson);
+                        foreach (var cmd in cmdDoc.RootElement.EnumerateArray())
+                        {
+                            var commandId = cmd.GetProperty("commandId").GetString();
+                            var commandName = cmd.GetProperty("command").GetString();
+                            string result = "Success";
+                            try
+                            {
+                                switch (commandName)
+                                {
+                                    case "RefreshBlocklist":
+                                        await _engine.UpdateBlocklistAsync();
+                                        break;
+                                    case "RestartEngine":
+                                        _engine.Stop();
+                                        _engine.Start();
+                                        break;
+                                    case "DiagnosticDump":
+                                        var diagPath = Path.Combine(
+                                            ConfigManager.AppFolder,
+                                            $"diagnostics_{DateTime.UtcNow:yyyyMMdd_HHmmss}.json");
+                                        await File.WriteAllTextAsync(diagPath,
+                                            System.Text.Json.JsonSerializer.Serialize(new
+                                            {
+                                                timestamp = DateTime.UtcNow,
+                                                totalQueries = MetricsManager.Current.TotalQueries,
+                                                blockedQueries = MetricsManager.Current.BlockedQueries,
+                                                engineRunning = _engine.IsRunning
+                                            }), stoppingToken);
+                                        break;
+                                }
+                            }
+                            catch (Exception cex)
+                            {
+                                result = "Failed";
+                                _logger.LogWarning("[CloudCmd] Command {0} failed: {1}", commandName, cex.Message);
+                            }
+
+                            // Ack command
+                            try
+                            {
+                                using var ackReq = new System.Net.Http.HttpRequestMessage(
+                                    System.Net.Http.HttpMethod.Post,
+                                    $"{SecurityConfigManager.Settings.CloudApiEndpoint}/api/command/ack");
+                                ackReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                                    "Bearer", SecurityConfigManager.Settings.DeviceApiToken);
+                                ackReq.Content = new System.Net.Http.StringContent(
+                                    System.Text.Json.JsonSerializer.Serialize(new { commandId, result }),
+                                    System.Text.Encoding.UTF8, "application/json");
+                                await client.SendAsync(ackReq, stoppingToken);
+                            }
+                            catch (Exception aex)
+                            {
+                                _logger.LogWarning("[CloudCmd] Ack failed: {0}", aex.Message);
+                            }
+                        }
+                    }
+                }
+                catch (OperationCanceledException) { break; }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning("[CloudSync:Heartbeat] Non-fatal error: {0}", ex.Message);
+                }
+            }
+        }, stoppingToken);
+
+        // Keep service alive (broadcast server runs independently as fire-and-forget above)
+        await commandServer;
+
+        } // end try
+        catch (Exception ex)
+        {
+            var crashLog = $"[{DateTime.UtcNow:O}] Worker.ExecuteAsync fatal exception:{Environment.NewLine}{ex}{Environment.NewLine}";
+            _logger.LogCritical(ex, "[Worker] Fatal exception — service is dying");
+            try
+            {
+                Directory.CreateDirectory("/var/log/aegisdns");
+                File.AppendAllText("/var/log/aegisdns/worker-crash.log", crashLog);
+            }
+            catch
+            {
+                // If we can't write the crash log, there's nothing more we can do.
+            }
+            throw;
+        }
+    }
+
+
+    private async Task<IpcSystem.IpcPacket> OnIpcCommand(IpcSystem.IpcPacket packet)
+    {
+        _logger.LogDebug("[IPC] Received command: {Command}", packet.Command);
+
+        return packet.Command switch
+        {
+            "GetStatus" => HandleGetStatusCommand(),
+            "GetMetrics" => new IpcSystem.IpcPacket("MetricsResponse", JsonSerializer.Serialize(new { Total = MetricsManager.Current.TotalQueries, Blocked = MetricsManager.Current.BlockedQueries, CacheHits = MetricsManager.Current.CacheHits })),
+            "GetHistory" => new IpcSystem.IpcPacket("HistoryResponse", JsonSerializer.Serialize(MetricsHistory.GetLast(60))),
+            "Toggle" => await HandleToggleCommand(),
+            "UpdateBlocklists" => await HandleUpdateBlocklistsCommand(),
+            "XDP_DETACH" => HandleXdpDetach(),
+            "XDP_RECONFIGURE" => await HandleXdpReconfigure(),
+            _ => new IpcSystem.IpcPacket("Error", "Unknown Command")
+        };
+    }
+
+    private IpcSystem.IpcPacket HandleGetStatusCommand()
+    {
+        string status = _engine.IsRunning ? "ONLINE" : "OFFLINE";
+        var tier = LicenseManager.CurrentTier;
+        _logger.LogInformation("[IPC] GetStatus -> status={Status}, serviceLicenseTier={Tier}", status, tier);
+        return new IpcSystem.IpcPacket("StatusResponse", status);
+    }
+
+    private async Task<IpcSystem.IpcPacket> HandleUpdateBlocklistsCommand()
+    {
+        await _engine.UpdateBlocklistAsync();
+        return new IpcSystem.IpcPacket("UpdateResponse", "OK");
+    }
+
+    private async Task<IpcSystem.IpcPacket> HandleToggleCommand()
+    {
+        await Task.Run(async () =>
+        {
+            if (_engine.IsRunning)
+            {
+                _tamperMonitor.Stop();
+                if (OperatingSystem.IsLinux())
+                {
+                    AegisDNS.Core.Proxy.TrafficRedirector.Disable();
+                    _proxyHost?.Stop();
+                    _proxyHost = null;
+
+                    AegisBpfLoader.Detach();
+                    AegisXdpLoader.Detach();
+                }
+                _engine.Stop();
+            }
+            else
+            {
+                _engine.Start();
+                _tamperMonitor.Start();
+
+                if (OperatingSystem.IsLinux())
+                {
+                    // Phase 18 — HTTPS Proxy
+                    if (HttpsProxyConfigManager.Settings.EnableHttpsProxy &&
+                        LicenseManager.CurrentTier >= LicenseManager.LicenseTier.Pro)
+                    {
+                        if (AegisDNS.Core.Security.CertificateManager.IsCaInstalled())
+                        {
+                            try
+                            {
+                                _proxyHost = new AegisDNS.Core.Proxy.HttpsProxyHost(
+                                    HttpsProxyConfigManager.Settings.ProxyPort,
+                                    HttpsProxyConfigManager.Settings.MaxProxyConnections);
+                                _proxyHost.Start();
+                                AegisDNS.Core.Proxy.TrafficRedirector.Enable(HttpsProxyConfigManager.Settings.ProxyPort);
+                                _engine.Broadcast("🔒 HTTPS Ad Interception active — URL patterns enabled");
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, "[Proxy] Failed to start");
+                                _engine.Broadcast($"⚠️ HTTPS Proxy failure: {ex.Message}");
+                            }
+                        }
+                        else
+                        {
+                            _engine.Broadcast("⚠️ HTTPS Proxy disabled — CA certificate not installed");
+                        }
+                    }
+
+                    if (XdpConfigManager.Settings.EnableEbpf)
+                    {
+                        string bpfObjPath = Path.Combine(AppContext.BaseDirectory, "kernel", "aegisdns.bpf.o");
+
+                        if (File.Exists(bpfObjPath))
+                        {
+                            bool bpfLoaded = await AegisBpfLoader.LoadAndAttach(bpfObjPath, _engine);
+                            if (bpfLoaded)
+                                _engine.Broadcast("🔥 eBPF kernel hook active — maximum protection enabled");
+                            else
+                                _engine.Broadcast("⚠️ eBPF load failed — running in iptables mode");
+                        }
+                        else
+                        {
+                            _engine.Broadcast("⚠️ aegisdns.bpf.o not found — run install.sh to compile kernel program");
+                        }
+                    }
+                }
+
+                // Phase 15: XDP Ingress Shield (Enterprise only)
+                await AttachXdpAsync();
+            }
+        });
+
+        return new IpcSystem.IpcPacket("ToggleResponse", _engine.IsRunning ? "ONLINE" : "OFFLINE");
+    }
+
+    private async Task AttachXdpAsync()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+
+        var xdpMode = (XdpMode)XdpConfigManager.Settings.XdpMode;
+        if (xdpMode == XdpMode.Off) return;
+
+        string xdpObjPath = Path.Combine(AppContext.BaseDirectory, "xdp", "aegis_xdp.o");
+        if (!File.Exists(xdpObjPath))
+        {
+            _engine.Broadcast("⚠️ aegis_xdp.o not found — run install.sh to compile XDP program");
+            return;
+        }
+
+        bool loaded = await AegisXdpLoader.LoadAndAttach(
+            xdpObjPath,
+            XdpConfigManager.Settings.XdpInterface,
+            xdpMode,
+            _engine);
+
+        if (loaded)
+            _engine.Broadcast("⚡ XDP ingress shield active — kernel-level DNS response filtering enabled");
+        else
+            _engine.Broadcast("⚠️ XDP load failed — eBPF egress protection remains active");
+    }
+
+    private IpcSystem.IpcPacket HandleXdpDetach()
+    {
+        if (OperatingSystem.IsLinux())
+            AegisXdpLoader.Detach();
+        return new IpcSystem.IpcPacket("XdpResponse", "DETACHED");
+    }
+
+    private async Task<IpcSystem.IpcPacket> HandleXdpReconfigure()
+    {
+        if (OperatingSystem.IsLinux())
+        {
+            AegisXdpLoader.Detach();
+            await AttachXdpAsync();
+        }
+        return new IpcSystem.IpcPacket("XdpResponse", "RECONFIGURED");
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        _metricsTimer.Stop();
+        _metricsTimer.Dispose();
+
+        // Phase 11 — stop Extension API and Latency Monitor before engine
+        _extensionApi?.Stop();
+        _latencyMonitor?.Stop();
+
+        await _pluginManager.ShutdownPluginsAsync();
+        if (OperatingSystem.IsLinux())
+        {
+            AegisDNS.Core.Proxy.TrafficRedirector.Disable();
+            _proxyHost?.Stop();
+
+            AegisBpfLoader.Detach();
+            AegisXdpLoader.Detach();
+        }
+        if (_webDashboard != null)
+            await _webDashboard.StopAsync().ConfigureAwait(false);
+        await base.StopAsync(cancellationToken);
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Core/Core/Engine.cs">
+using System.Collections.Concurrent;
+using System.Collections.Immutable;
+using System.Diagnostics;
+using System.Net;
+using System.Net.NetworkInformation; // For dynamic interface detection
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Channels;
+
+using AegisDNS.Core;
+using AegisDNS.Core.Dns;
+using AegisDNS.Core.Monitoring;
+using AegisDNS.Core.Platform;
+using AegisDNS.Core.ProcessTracking;
+using AegisDNS.Core.RouterMode;
+using AegisDNS.Core.Scheduling;
+using AegisDNS.Core.Utilities;
+using AegisDNS.Licensing; // Added for new LicenseManager
+
+using ARSoft.Tools.Net.Dns;
+
+using Microsoft.Extensions.Logging;
+
+namespace AegisDNS.Core;
+
+public class AegisEngine
+{
+    // --- PRIVATE MEMBERS ---
+    private readonly ILoggerFactory _loggerFactory;
+    private readonly ILogger<AegisEngine> _logger;
+    private readonly Channel<string> _aiQueue = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true });
+    public ChannelReader<string> AiQueueReader => _aiQueue.Reader;
+    private DnsServer? _server;
+    private DnsClient? _upstreamClient;
+    private ImmutableHashSet<string> _blocklist = ImmutableHashSet<string>.Empty.WithComparer(StringComparer.OrdinalIgnoreCase);
+    private List<string> _originalDns = new();
+    private bool _originalDnsWasDhcp = true;
+    private readonly ConcurrentDictionary<string, (DnsMessage Response, DateTime Expiry)> _cache = new();
+    private readonly ConcurrentDictionary<IPAddress, int> _requestCounts = new();
+    private readonly System.Timers.Timer _throttleTimer;
+    private readonly DoHClient _dohClient;
+    private readonly QueryHistoryBuffer _history = new(200);
+    private AiWatchdog? _aiWatchdog;
+    private readonly BlocklistManager _listManager = new();
+    private readonly DomainRoleManager _roleManager = new();
+    private readonly ISystemDnsManager _dnsManager;
+
+    // Phase 11 — Process rules, scheduling, DoT
+    private readonly ProcessRuleEngine _processRuleEngine = new();
+    private readonly ScheduleEngine _scheduleEngine = new();
+    private DotClient? _dotClient;
+
+    public AegisEngine(ILoggerFactory loggerFactory)
+    {
+        _loggerFactory = loggerFactory;
+        _logger = loggerFactory.CreateLogger<AegisEngine>();
+        _dohClient = new DoHClient(loggerFactory.CreateLogger<DoHClient>());
+        // Attach to exit events for safe DNS restoration
+        AppDomain.CurrentDomain.ProcessExit += (s, e) => Stop();
+        AppDomain.CurrentDomain.UnhandledException += (s, e) => Stop();
+
+        _dnsManager = new LinuxDnsManager(Broadcast);
+
+        // --- CRASH RECOVERY: Restore DNS from file snapshot if previous session crashed ---
+        var snapshot = DnsSnapshot.Load();
+        if (snapshot != null)
+        {
+            Broadcast("⚠️ Crash recovery: Restoring DNS from saved snapshot...");
+            _originalDns = snapshot.OriginalDns;
+            _originalDnsWasDhcp = snapshot.WasDhcp;
+            SetSystemDns(false); // Restore the original DNS
+            Broadcast("✅ DNS restored successfully from crash snapshot.");
+        }
+
+        // Throttling timer: Reset every 60 seconds
+        _throttleTimer = new System.Timers.Timer(60000);
+        _throttleTimer.Elapsed += (s, e) => _requestCounts.Clear();
+        _throttleTimer.AutoReset = true;
+        _throttleTimer.Start();
+
+        // Load Allowlist
+        AllowlistManager.Load();
+        AiLearnedBlocklist.Load();
+
+        // Load false positive reports — these are auto-added to the allowlist on load.
+        // SafeListingManager uses a static constructor so no explicit Load() call is needed.
+    }
+
+    // --- 1. NEW EVENT SYSTEM (For Dashboard & Log Window sync) ---
+    public event Action<string>? LogReceived;
+
+    // --- 2. COMPATIBILITY LOGGER (Restored to fix build errors) ---
+    // This allows older parts of the app to still function without crashing.
+    public Action<string>? Logger { get; set; }
+
+    public bool IsRunning { get; private set; }
+    private long _blockedCount;
+    public long BlockedCount => Interlocked.Read(ref _blockedCount);
+
+    /// <summary>
+    /// Fetches and updates the blocklist domains in background.
+    /// </summary>
+    public async Task UpdateBlocklistAsync()
+    {
+        try
+        {
+            Broadcast("⏳ Updating multi-source Hagezi blocklists...");
+            var domains = await _listManager.FetchAndParseAsync(msg => Task.Run(() => Broadcast(msg)));
+            LoadBlocklist(domains);
+            Broadcast("✅ Blocklist update complete.");
+        }
+        catch (Exception ex)
+        {
+            Broadcast($"❌ Blocklist Update Error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    ﻿	/// Loads the provided domains into the high-speed memory blocklist.
+    ﻿	/// </summary>
+    public void LoadBlocklist(IEnumerable<string> domains)
+    {
+        var builder = ImmutableHashSet.CreateBuilder<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var d in domains)
+        {
+            if (!string.IsNullOrWhiteSpace(d))
+            {
+                // Clean the domain so "example.com." becomes "example.com"
+                builder.Add(d.Trim().ToLower().TrimEnd('.'));
+            }
+        }
+
+        _blocklist = builder.ToImmutable();
+        Broadcast($"📚 Loaded {_blocklist.Count:N0} rules into memory.");
+    }
+
+    public IEnumerable<string> GetCurrentBlocklist()
+    {
+        return _blocklist;
+    }
+
+    /// <summary>
+    /// Atomically adds a new domain to the high-speed memory blocklist (used by AI feedback loop).
+    /// </summary>
+    public void AddToBlocklist(string domain)
+    {
+        if (string.IsNullOrWhiteSpace(domain)) return;
+        var cleanDomain = domain.Trim().ToLower().TrimEnd('.');
+        ImmutableInterlocked.Update(ref _blocklist, list => list.Add(cleanDomain));
+        Broadcast($"🤖 AI added dynamic rule to memory: {cleanDomain}");
+    }
+
+    /// <summary>
+    /// Starts the DNS server and modifies system settings.
+    /// </summary>
+    public void Start()
+    {
+        if (IsRunning) return;
+
+        // --- LICENSE ENFORCEMENT ---
+        if (LicenseManager.IsTrialExpired)
+        {
+            Broadcast("TRIAL_EXPIRED");
+            return;
+        }
+
+        try
+        {
+            // --- DYNAMIC UPSTREAM INIT ---
+            // Use TryParse with safe fallbacks for corrupted/missing settings
+            var upstreamIps = new List<IPAddress>();
+
+            if (!IPAddress.TryParse(DnsConfigManager.Settings.PrimaryDns, out var primaryDns))
+            {
+                primaryDns = IPAddress.Parse("8.8.8.8");
+                Broadcast("⚠️ WARNING: Primary DNS setting invalid or missing. Using fallback: 8.8.8.8");
+            }
+            upstreamIps.Add(primaryDns);
+
+            if (!IPAddress.TryParse(DnsConfigManager.Settings.SecondaryDns, out var secondaryDns))
+            {
+                secondaryDns = IPAddress.Parse("1.1.1.1");
+                Broadcast("⚠️ WARNING: Secondary DNS setting invalid or missing. Using fallback: 1.1.1.1");
+            }
+            upstreamIps.Add(secondaryDns);
+
+            _upstreamClient = new DnsClient(upstreamIps, 2000);
+
+            // 1. Create the Transports — support router mode or loopback
+            IPAddress bindAddress = IPAddress.Loopback;
+            int bindPort = 53;
+
+            if (RouterConfigManager.Settings.EnableRouterMode)
+            {
+                if (!IPAddress.TryParse(RouterConfigManager.Settings.RouterModeBindAddress, out var routerAddr))
+                    routerAddr = IPAddress.Any;
+                bindAddress = routerAddr;
+                bindPort = RouterConfigManager.Settings.RouterModePort;
+            }
+
+            try
+            {
+                var udpTransport = new UdpServerTransport(bindAddress, bindPort);
+                var tcpTransport = new TcpServerTransport(bindAddress, bindPort);
+                _server = new DnsServer(udpTransport, tcpTransport);
+            }
+            catch (Exception bindEx)
+            {
+                Broadcast($"⚠️ Router mode bind failed ({bindAddress}:{bindPort}): {bindEx.Message}. Reverting to loopback.");
+                RouterConfigManager.Settings.EnableRouterMode = false;
+                ConfigManager.Save();
+                var udpTransport = new UdpServerTransport(IPAddress.Loopback, 53);
+                var tcpTransport = new TcpServerTransport(IPAddress.Loopback, 53);
+                _server = new DnsServer(udpTransport, tcpTransport);
+            }
+
+            // Phase 11 — Init DoT client if configured
+            _dotClient = DnsConfigManager.Settings.UpstreamMode == UpstreamMode.DoT
+                ? new DotClient(DnsConfigManager.Settings.DoTUpstream)
+                : null;
+
+            // 2. Wire event handler
+            _server.QueryReceived += OnQueryReceived;
+
+            // 3. Start Listening
+            _server.Start();
+
+            // 3.5 Start AI Watchdog Background Worker
+            _aiWatchdog = new AiWatchdog(this, _roleManager, _loggerFactory.CreateLogger<AiWatchdog>());
+            _aiWatchdog.Start();
+
+            IsRunning = true;
+
+            // 4. Change system DNS settings using our dynamic detector
+            SetSystemDns(true);
+
+            Broadcast("Success: Shield is online");
+        }
+        catch (Exception ex)
+        {
+            // Walk the exception chain to find a SocketException — the transport
+            // layer may wrap it in an outer exception.
+            System.Net.Sockets.SocketException? sockEx = null;
+            for (Exception? e = ex; e != null; e = e.InnerException)
+            {
+                if (e is System.Net.Sockets.SocketException s)
+                {
+                    sockEx = s;
+                    break;
+                }
+            }
+
+            if (sockEx?.SocketErrorCode == System.Net.Sockets.SocketError.AddressAlreadyInUse)
+                Broadcast("❌ Port 53 is in use. Run: sudo systemctl stop systemd-resolved");
+            else
+            {
+                Broadcast($"❌ STARTUP ERROR: {ex.Message}");
+                Broadcast("👉 Hint: Run as Administrator or check if Port 53 is free.");
+            }
+            Stop();
+        }
+    }
+
+    /// <summary>
+    ﻿				/// Stops the server and restores the user's original internet settings.
+    ﻿				/// </summary>
+    public void Stop()
+    {
+        try
+        {
+            if (_server != null)
+            {
+                _server.Stop();
+                _server = null;
+            }
+            if (_aiWatchdog != null)
+            {
+                _aiWatchdog.Stop();
+                _aiWatchdog = null;
+            }
+
+            IsRunning = false;
+
+            // Restore Internet
+            SetSystemDns(false);
+
+            Broadcast("Shield deactivated: Service offline");
+        }
+        catch (Exception ex)
+        {
+            Broadcast($"⚠️ Error stopping: {ex.Message}");
+        }
+    }
+    /// <summary>
+    ﻿	/// The main interceptor. Decides whether to kill a request or let it through. (Strictly Synchronous)
+    ﻿	/// </summary>
+    private Task OnQueryReceived(object sender, QueryReceivedEventArgs e)
+    {
+        try
+        {
+            if (e.Query is not DnsMessage query) return Task.CompletedTask;
+
+            MetricsManager.IncrementTotal();
+
+            // --- CHECK 0: Throttling ---
+            var remoteIp = e.RemoteEndpoint.Address;
+            _requestCounts.AddOrUpdate(remoteIp, 1, (_, count) => count + 1);
+            if (_requestCounts.TryGetValue(remoteIp, out int currentCount) && currentCount > 100)
+            {
+                // Drop the request by not setting e.Response
+                return Task.CompletedTask;
+            }
+
+            var question = query.Questions.FirstOrDefault();
+            if (question == null) return Task.CompletedTask;
+
+            // Clean the domain name (remove trailing dot for matching)
+            var originalName = question.Name.ToString();
+            var cleanName = originalName.TrimEnd('.');
+
+            // Mirror to AI Diagnostics
+            _aiQueue.Writer.TryWrite(cleanName);
+
+            // Router mode: track non-loopback devices (fire-and-forget)
+            bool isNonLoopback = RouterConfigManager.Settings.EnableRouterMode && !IPAddress.IsLoopback(remoteIp);
+
+            // --- CHECK 0.3: Per-Process DNS Rules (Pro+) ---
+            bool processAllowAll = false;
+            if (RouterConfigManager.Settings.EnablePerProcessBlocking &&
+                LicenseManager.CurrentTier >= LicenseManager.LicenseTier.Pro)
+            {
+                try
+                {
+                    var remoteEndpoint = e.RemoteEndpoint as IPEndPoint;
+                    int sourcePort = remoteEndpoint?.Port ?? 0;
+                    if (sourcePort > 0)
+                    {
+                        string? processName = ResolveProcessNameFromPort(sourcePort);
+                        if (processName != null)
+                        {
+                            bool? decision = _processRuleEngine.ShouldBlock(processName, cleanName);
+                            if (decision == true)
+                            {
+                                Interlocked.Increment(ref _blockedCount);
+                                MetricsManager.IncrementBlocked();
+                                Broadcast($"🔒 PROCESS-BLOCK: {cleanName} [{processName}]");
+                                var resp = query.CreateResponseInstance();
+                                resp.ReturnCode = ReturnCode.Refused;
+                                e.Response = resp;
+                                _history.Add(cleanName, true, "Per-Process Rule");
+                                if (isNonLoopback)
+                                    ThreadPool.QueueUserWorkItem(_ => ConnectedDeviceTracker.Instance.RecordQuery(remoteIp, true));
+                                return Task.CompletedTask;
+                            }
+                            processAllowAll = decision == false;
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // --- CHECK 0.4: Scheduled / Time-Based Blocking (Pro+) ---
+            if (!processAllowAll &&
+                RouterConfigManager.Settings.EnableScheduledBlocking &&
+                LicenseManager.CurrentTier >= LicenseManager.LicenseTier.Pro &&
+                _scheduleEngine.IsScheduledBlock(cleanName))
+            {
+                Interlocked.Increment(ref _blockedCount);
+                MetricsManager.IncrementBlocked();
+                Broadcast($"🕐 SCHEDULE-BLOCK: {cleanName}");
+                var resp = query.CreateResponseInstance();
+                resp.ReturnCode = ReturnCode.Refused;
+                e.Response = resp;
+                _history.Add(cleanName, true, "Schedule");
+                if (isNonLoopback)
+                    ThreadPool.QueueUserWorkItem(_ => ConnectedDeviceTracker.Instance.RecordQuery(remoteIp, true));
+                return Task.CompletedTask;
+            }
+
+            // --- CHECK 0.5: User Allowlist (bypass blocklist entirely) ---
+            if (!processAllowAll && !AllowlistManager.Contains(cleanName))
+            {
+                // --- CHECK 0.7: AI-Learned Blocklist ---
+                if (AiLearnedBlocklist.Contains(cleanName))
+                {
+                    Interlocked.Increment(ref _blockedCount);
+                    MetricsManager.IncrementBlocked();
+                    Broadcast($"🤖 AI-LEARNED BLOCK: {cleanName}");
+                    var response = query.CreateResponseInstance();
+                    response.ReturnCode = ReturnCode.Refused;
+                    e.Response = response;
+                    var aiRole = _roleManager.GetRoleSnapshot(cleanName);
+                    TimeSpan? ageLog = aiRole != null ? DateTime.UtcNow - aiRole.FirstSeenAt : null;
+                    _history.Add(cleanName, true, "AI-Learned List", ageLog);
+                    if (isNonLoopback)
+                        ThreadPool.QueueUserWorkItem(_ => ConnectedDeviceTracker.Instance.RecordQuery(remoteIp, true));
+                    return Task.CompletedTask;
+                }
+
+                // --- CHECK 1: Is it in the static blocklist or dynamically identified by role? ---
+                bool isBlocked = _blocklist.Contains(cleanName);
+
+                if (!isBlocked)
+                {
+                    var role = _roleManager.GetRoleSnapshot(cleanName);
+                    if (role != null && role.ShouldBlock())
+                    {
+                        isBlocked = true;
+                        // Optionally alert the user that it was dynamically blocked by behavior
+                        Broadcast($"🤖 BEHAVIOR BLOCK [{SessionManager.CurrentPhase}]: {cleanName} (Monetization: {role.MonetizationScore:F2}, Func: {role.FunctionalScore:F2})");
+                    }
+                }
+
+                if (isBlocked)
+                {
+                    Interlocked.Increment(ref _blockedCount); // Atomic increment for thread safety
+                    MetricsManager.IncrementBlocked();
+                    TopDomainsTracker.RecordBlocked(cleanName);
+                    Broadcast($"🚫 BLOCKED: {cleanName}");
+
+                    // Create a "Refused" response to kill the ad/tracker
+                    var response = query.CreateResponseInstance();
+                    response.ReturnCode = ReturnCode.Refused;
+                    e.Response = response;
+                    var snapshot = _roleManager.GetRoleSnapshot(cleanName);
+                    TimeSpan? snapshotAge = snapshot != null ? DateTime.UtcNow - snapshot.FirstSeenAt : null;
+                    string reason = (snapshot != null && snapshot.ShouldBlock()) ? "Behavioral Threshold" : "Static Feed";
+                    _history.Add(cleanName, true, reason, snapshotAge);
+                    if (isNonLoopback)
+                        ThreadPool.QueueUserWorkItem(_ => ConnectedDeviceTracker.Instance.RecordQuery(remoteIp, true));
+                    return Task.CompletedTask;
+                }
+
+                // --- CHECK 1.5: Streaming Ad Blocklist (Pro+, Phase 17) ---
+                if (StreamingBlockEngine.IsStreamingAdDomain(cleanName))
+                {
+                    Interlocked.Increment(ref _blockedCount);
+                    MetricsManager.IncrementBlocked();
+                    MetricsManager.IncrementStreamingAdsBlocked();
+                    TopDomainsTracker.RecordBlocked(cleanName);
+                    Broadcast($"📺 [StreamingAd] BLOCKED: {cleanName}");
+                    var streamResp = query.CreateResponseInstance();
+                    streamResp.ReturnCode = ReturnCode.Refused;
+                    e.Response = streamResp;
+                    _history.Add(cleanName, true, "Streaming Ad Blocklist");
+                    if (isNonLoopback)
+                        ThreadPool.QueueUserWorkItem(_ => ConnectedDeviceTracker.Instance.RecordQuery(remoteIp, true));
+                    return Task.CompletedTask;
+                }
+            } // End Blocklist check
+            else
+            {
+                // Domain is allowlisted — log and fall through to upstream resolution
+                if (ConfigManager.Settings.LogDnsRequests)
+                    Broadcast($"✅ ALLOWED: {cleanName}");
+                TopDomainsTracker.RecordAllowed(cleanName);
+                if (isNonLoopback)
+                    ThreadPool.QueueUserWorkItem(_ => ConnectedDeviceTracker.Instance.RecordQuery(remoteIp, false));
+            }
+
+            // --- CHECK 2: Cache lookup ---
+            string cacheKey = $"{cleanName}_{question.RecordType}";
+            if (_cache.TryGetValue(cacheKey, out var cached) && cached.Expiry > DateTime.UtcNow)
+            {
+                MetricsManager.IncrementCacheHit();
+                if (ConfigManager.Settings.LogDnsRequests)
+                {
+                    Broadcast($"⚡ CACHE HIT: {cleanName}");
+                }
+
+                var cachedResponse = query.CreateResponseInstance();
+                cachedResponse.ReturnCode = cached.Response.ReturnCode;
+                cachedResponse.AnswerRecords.AddRange(cached.Response.AnswerRecords);
+                cachedResponse.AuthorityRecords.AddRange(cached.Response.AuthorityRecords);
+                cachedResponse.AdditionalRecords.AddRange(cached.Response.AdditionalRecords);
+
+                e.Response = cachedResponse;
+                return Task.CompletedTask;
+            }
+
+            // --- CHECK 3: If safe, forward to user's chosen DNS ---
+            try
+            {
+                if (ConfigManager.Settings.LogDnsRequests)
+                {
+                    Broadcast($"🔎 Request: {cleanName}");
+                }
+
+                DnsMessage? upstreamResponse = null;
+
+                // --- DoT Resolution (Phase 11) ---
+                if (_dotClient != null && DnsConfigManager.Settings.UpstreamMode == UpstreamMode.DoT)
+                {
+                    upstreamResponse = _dotClient.Resolve(question.Name, question.RecordType, question.RecordClass);
+                    // If DoT fails, fall through to standard UDP below
+                }
+
+                // --- Standard Resolution (UDP fallback or primary) ---
+                if (upstreamResponse == null && _upstreamClient != null)
+                {
+                    // ARSoft Resolve method sync version
+                    upstreamResponse = _upstreamClient.Resolve(question.Name, question.RecordType, question.RecordClass);
+                }
+
+                if (upstreamResponse != null)
+                {
+                    // Bug 49 fix: rewrite transaction ID to match the original client query.
+                    // ARSoft's upstream DnsClient uses its own internal TX ID for multiplexing.
+                    // Assigning upstreamResponse directly sends the wrong ID back to the client.
+                    // CreateResponseInstance() stamps the correct client TX ID onto the response.
+                    var clientResponse = query.CreateResponseInstance();
+                    clientResponse.ReturnCode = upstreamResponse.ReturnCode;
+                    clientResponse.IsRecursionAllowed = true;
+                    clientResponse.AnswerRecords.AddRange(upstreamResponse.AnswerRecords);
+                    clientResponse.AuthorityRecords.AddRange(upstreamResponse.AuthorityRecords);
+                    clientResponse.AdditionalRecords.AddRange(upstreamResponse.AdditionalRecords);
+                    e.Response = clientResponse;
+                    Broadcast($"[Bug49] client ID={query.TransactionID} upstream ID={upstreamResponse.TransactionID} proxied ID={clientResponse.TransactionID}");
+                    var snapshot = _roleManager.GetRoleSnapshot(cleanName);
+                    TimeSpan? snapshotAge = snapshot != null ? DateTime.UtcNow - snapshot.FirstSeenAt : null;
+                    _history.Add(cleanName, false, "", snapshotAge);
+                    TopDomainsTracker.RecordAllowed(cleanName);
+                    if (isNonLoopback)
+                        ThreadPool.QueueUserWorkItem(_ => ConnectedDeviceTracker.Instance.RecordQuery(remoteIp, false));
+
+                    // Save to cache if it has answers
+                    if (upstreamResponse.AnswerRecords.Count > 0)
+                    {
+                        int minTtl = upstreamResponse.AnswerRecords.Min(r => r.TimeToLive);
+                        if (minTtl > 0)
+                        {
+                            // Lazily prune if too large
+                            if (_cache.Count > ConfigManager.Settings.CacheSize * 10)
+                            {
+                                _cache.Clear(); // Simple truncation if we hit the limit
+                            }
+
+                            _cache[cacheKey] = (upstreamResponse, DateTime.UtcNow.AddSeconds(minTtl));
+                        }
+                    }
+                }
+                else
+                {
+                    MetricsManager.IncrementUpstreamFailure();
+                }
+            }
+            catch (Exception ex)
+            {
+                MetricsManager.IncrementUpstreamFailure();
+                Broadcast($"⚠️ Upstream Error: {cleanName} - {ex.Message}");
+
+                // FAIL-SAFE: If DoH fails, force a standard UDP fallback right here
+                try
+                {
+                    if (_upstreamClient != null)
+                    {
+                        var fallbackResponse = _upstreamClient.Resolve(question.Name, question.RecordType, question.RecordClass);
+                        if (fallbackResponse != null)
+                        {
+                            var clientFallback = query.CreateResponseInstance();
+                            clientFallback.ReturnCode = fallbackResponse.ReturnCode;
+                            clientFallback.IsRecursionAllowed = true;
+                            clientFallback.AnswerRecords.AddRange(fallbackResponse.AnswerRecords);
+                            clientFallback.AuthorityRecords.AddRange(fallbackResponse.AuthorityRecords);
+                            clientFallback.AdditionalRecords.AddRange(fallbackResponse.AdditionalRecords);
+                            e.Response = clientFallback;
+                        }
+                    }
+                }
+                catch
+                {
+                    // If even the fallback fails, return a "Server Failure" so the browser 
+                    // knows the request is dead instead of just waiting forever.
+                    var errResponse = query.CreateResponseInstance();
+                    errResponse.ReturnCode = ReturnCode.ServerFailure;
+                    e.Response = errResponse;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Top-level catch to prevent DNS server crashes
+            Broadcast($"❌ CRITICAL DNS ERROR: {ex.Message}");
+            try
+            {
+                // Try to return a server failure response
+                if (e.Query is DnsMessage query)
+                {
+                    var errResponse = query.CreateResponseInstance();
+                    errResponse.ReturnCode = ReturnCode.ServerFailure;
+                    e.Response = errResponse;
+                }
+            }
+            catch
+            {
+                // If we can't even create an error response, just log and continue
+            }
+        }
+        return Task.CompletedTask;
+    }
+
+    // --- BROADCAST BRIDGE ---
+    // This sends messages to ALL listeners: Dashboard, LogWindow, and Logger property
+    public void Broadcast(string msg)
+    {
+        LogReceived?.Invoke(msg); // New Event System
+        Logger?.Invoke(msg);      // Old Property System (Compatibility)
+    }
+
+    public void TriggerLog(string msg)
+    {
+        Broadcast(msg);
+    }
+
+    /// <summary>
+    /// Restores the original DNS settings from the persistent snapshot.
+    /// </summary>
+    public static void RestoreSystemDns()
+    {
+        var engine = new AegisEngine(Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
+        var snapshot = DnsSnapshot.Load();
+        if (snapshot != null)
+        {
+            engine._originalDns = snapshot.OriginalDns;
+            engine._originalDnsWasDhcp = snapshot.WasDhcp;
+            engine.SetSystemDns(false);
+        }
+    }
+
+    /// <summary>
+    /// Uses 'resolvectl' (Linux) to tell the OS to use our app as the DNS server.
+    ﻿		/// </summary>
+    private void SetSystemDns(bool enable)
+    {
+        try
+        {
+            string interfaceName = DetectActiveInterface();
+            if (string.IsNullOrEmpty(interfaceName)) return;
+
+            if (enable)
+            {
+                _dnsManager.SetDns("127.0.0.1");
+            }
+            else
+            {
+                _dnsManager.RestoreDns();
+            }
+        }
+        catch (Exception ex)
+        {
+            Broadcast($"⚠️ DNS Switch Error: {ex.Message}");
+        }
+    }
+
+    private void BackupOriginalDns(string interfaceName)
+    {
+        var active = NetworkInterface.GetAllNetworkInterfaces()
+            .FirstOrDefault(ni => ni.Name == interfaceName);
+
+        if (active != null)
+        {
+            var dns = active.GetIPProperties().DnsAddresses;
+            _originalDns = dns.Select(a => a.ToString()).ToList();
+
+            // We assume it's DHCP if it was set to DHCP originally.
+            // .NET doesn't directly tell us if DNS is DHCP-managed easily,
+            // so we'll treat empty or 127.0.0.1 as a reason to fall back to DHCP on stop.
+            _originalDnsWasDhcp = _originalDns.Count == 0;
+        }
+    }
+
+    private string DetectActiveInterface()
+    {
+        var active = NetworkInterface.GetAllNetworkInterfaces()
+            .FirstOrDefault(ni => ni.OperationalStatus == OperationalStatus.Up &&
+                                  ni.GetIPProperties().GatewayAddresses.Count > 0 &&
+                                  ni.NetworkInterfaceType != NetworkInterfaceType.Loopback);
+
+        return active?.Name ?? string.Empty;
+    }
+
+    private void RunCommand(string command, string[] args)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo(command)
+            {
+                CreateNoWindow = true,
+                UseShellExecute = false
+            };
+            foreach (var arg in args)
+                psi.ArgumentList.Add(arg);
+            Process.Start(psi)?.WaitForExit(5000);
+        }
+        catch (Exception ex)
+        {
+            Broadcast($"⚠️ Command failed: {command} — {ex.Message}");
+        }
+    }
+
+
+
+    public IReadOnlyCollection<QueryHistoryEntry> GetHistory()
+    {
+        return _history.GetSnapshot();
+    }
+
+    // --- Phase 11: /proc-based process identity resolution ---
+
+    /// <summary>
+    /// Resolves the process name for a given UDP source port using /proc/net/udp.
+    /// Returns null on failure or timeout (> 1ms). Never throws.
+    /// </summary>
+    private static string? ResolveProcessNameFromPort(int sourcePort)
+    {
+        if (sourcePort <= 0) return null;
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            string hexPort = sourcePort.ToString("X4", System.Globalization.CultureInfo.InvariantCulture);
+
+            long inode = FindInodeForPort("/proc/net/udp", hexPort, sw);
+            if (inode < 0 && sw.ElapsedMilliseconds < 1)
+                inode = FindInodeForPort("/proc/net/udp6", hexPort, sw);
+            if (inode < 0) return null;
+
+            return FindProcessNameForInode(inode, sw);
+        }
+        catch { }
+        return null;
+    }
+
+    private static long FindInodeForPort(string path, string hexPort, Stopwatch sw)
+    {
+        if (!System.IO.File.Exists(path)) return -1;
+        try
+        {
+            foreach (var line in System.IO.File.ReadLines(path))
+            {
+                if (sw.ElapsedMilliseconds >= 1) return -1;
+                // Format: sl  local_address:port rem_address ...  inode
+                var parts = line.TrimStart().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 10) continue;
+                var addrParts = parts[1].Split(':');
+                if (addrParts.Length == 2 &&
+                    string.Equals(addrParts[1], hexPort, StringComparison.OrdinalIgnoreCase) &&
+                    long.TryParse(parts[9], out long inode))
+                {
+                    return inode;
+                }
+            }
+        }
+        catch { }
+        return -1;
+    }
+
+    private static string? FindProcessNameForInode(long inode, Stopwatch sw)
+    {
+        string socketTarget = $"socket:[{inode}]";
+        try
+        {
+            foreach (var pidDir in System.IO.Directory.EnumerateDirectories("/proc"))
+            {
+                if (sw.ElapsedMilliseconds >= 1) return null;
+                if (!int.TryParse(System.IO.Path.GetFileName(pidDir), out _)) continue;
+
+                string fdDir = System.IO.Path.Combine(pidDir, "fd");
+                if (!System.IO.Directory.Exists(fdDir)) continue;
+
+                try
+                {
+                    foreach (var fdEntry in System.IO.Directory.EnumerateFiles(fdDir))
+                    {
+                        if (sw.ElapsedMilliseconds >= 1) return null;
+                        string? linkTarget = new System.IO.FileInfo(fdEntry).LinkTarget;
+                        if (linkTarget != null && linkTarget.StartsWith('/'))
+                        {
+                            string resolved = System.IO.Path.GetFullPath(linkTarget);
+                            if (!IsProcSymlinkAllowed(resolved))
+                            {
+                                System.Diagnostics.Debug.WriteLine($"[Engine] Rejected /proc symlink outside allowed prefixes: {resolved}");
+                                continue;
+                            }
+                        }
+                        if (string.Equals(linkTarget, socketTarget, StringComparison.Ordinal))
+                        {
+                            string commPath = System.IO.Path.Combine(pidDir, "comm");
+                            return System.IO.File.Exists(commPath)
+                                ? System.IO.File.ReadAllText(commPath).Trim()
+                                : null;
+                        }
+                    }
+                }
+                catch { }
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    private static readonly string[] _allowedProcSymlinkPrefixes =
+        ["/proc/", "/usr/", "/bin/", "/sbin/", "/opt/", "/lib/"];
+
+    private static bool IsProcSymlinkAllowed(string resolvedPath)
+    {
+        foreach (var prefix in _allowedProcSymlinkPrefixes)
+            if (resolvedPath.StartsWith(prefix, StringComparison.Ordinal))
+                return true;
+        return false;
+    }
+}
+</file>
+
+</files>

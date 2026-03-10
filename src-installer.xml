@@ -1,0 +1,2519 @@
+This file is a merged representation of a subset of the codebase, containing specifically included files, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Only files matching these patterns are included: src/AegisDNS.Installer/**/*.cs, src/AegisDNS.Installer/**/*.axaml, src/AegisDNS.Installer/**/*.axaml.cs
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+src/
+  AegisDNS.Installer/
+    Pages/
+      AiConfigPage.axaml
+      AiConfigPage.axaml.cs
+      CompletePage.axaml
+      CompletePage.axaml.cs
+      DnsConfigPage.axaml
+      DnsConfigPage.axaml.cs
+      InstallProgressPage.axaml
+      InstallProgressPage.axaml.cs
+      InstallTypePage.axaml
+      InstallTypePage.axaml.cs
+      LicenseActivationPage.axaml
+      LicenseActivationPage.axaml.cs
+      LicenseAgreementPage.axaml
+      LicenseAgreementPage.axaml.cs
+      SystemAuditPage.axaml
+      SystemAuditPage.axaml.cs
+      WelcomePage.axaml
+      WelcomePage.axaml.cs
+    Services/
+      InstallService.cs
+    ViewModels/
+      InstallerViewModel.cs
+    App.axaml
+    App.axaml.cs
+    MainWindow.axaml
+    MainWindow.axaml.cs
+    Program.cs
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="src/AegisDNS.Installer/Pages/AiConfigPage.axaml">
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AegisDNS.Installer.ViewModels"
+             x:Class="AegisDNS.Installer.Pages.AiConfigPage"
+             x:DataType="vm:InstallerViewModel"
+             Background="#050505">
+    <ScrollViewer Padding="50,30,50,20">
+        <StackPanel Spacing="16">
+            <TextBlock Text="AI SENTINEL" Classes="SectionHeader"/>
+            <TextBlock Text="Optional. Configure an AI provider for real-time threat detection." Foreground="#555555" FontSize="12"/>
+
+            <TextBlock Text="PROVIDER" Classes="SectionHeader"/>
+            <ComboBox SelectedItem="{Binding AiProvider}" Background="#0A0A0A"
+                      BorderBrush="#333333" Foreground="Cyan" HorizontalAlignment="Stretch">
+                <ComboBoxItem Content="None"/>
+                <ComboBoxItem Content="OpenAI"/>
+                <ComboBoxItem Content="Anthropic"/>
+                <ComboBoxItem Content="OpenRouter"/>
+                <ComboBoxItem Content="Ollama (Local)"/>
+            </ComboBox>
+
+            <TextBox Text="{Binding AiApiKey}" Watermark="API Key..."
+                     PasswordChar="•" Background="#0A0A0A" Foreground="Cyan" BorderBrush="#333333" CornerRadius="4"/>
+
+            <TextBox Text="{Binding AiModel}" Watermark="Model (e.g. gpt-4o-mini, claude-3-haiku-20240307)"
+                     Background="#0A0A0A" Foreground="Cyan" BorderBrush="#333333" CornerRadius="4"/>
+
+            <Button Classes="Secondary" Content="Test Connection" Command="{Binding TestAiCommand}"/>
+            <TextBlock Text="{Binding AiTestResult}" Foreground="#00FF88" FontSize="11"/>
+
+            <TextBlock Text="AI can be configured later in Settings → AI Sentinel." Foreground="#444444" FontSize="10" FontStyle="Italic"/>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
+</file>
+
+<file path="src/AegisDNS.Installer/Pages/CompletePage.axaml">
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AegisDNS.Installer.ViewModels"
+             x:Class="AegisDNS.Installer.Pages.CompletePage"
+             x:DataType="vm:InstallerViewModel"
+             Background="#050505">
+    <ScrollViewer Padding="50,30,50,20">
+        <StackPanel Spacing="0" HorizontalAlignment="Center">
+            <TextBlock Text="✅" FontSize="64" HorizontalAlignment="Center" Margin="0,0,0,16"/>
+            <TextBlock Text="Installation Complete" FontSize="28" FontWeight="Bold"
+                       Foreground="Cyan" HorizontalAlignment="Center" LetterSpacing="1">
+                <TextBlock.Effect>
+                    <DropShadowEffect Color="Cyan" BlurRadius="12" Opacity="0.5"/>
+                </TextBlock.Effect>
+            </TextBlock>
+            <TextBlock Text="AegisDNS is ready to protect your network."
+                       Foreground="#777777" FontSize="13" HorizontalAlignment="Center" Margin="0,8,0,32"/>
+
+            <!-- Summary card -->
+            <Border Background="#111111" BorderBrush="#1E1E1E" BorderThickness="1"
+                    CornerRadius="8" Padding="24,18" Width="420">
+                <Grid RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="*,*">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Edition" Foreground="#555555" FontSize="11"/>
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SummaryEdition}" Foreground="Cyan" FontSize="11" HorizontalAlignment="Right"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="DNS Upstream" Foreground="#555555" FontSize="11" Margin="0,8,0,0"/>
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SummaryDns}" Foreground="#CCCCCC" FontSize="11" HorizontalAlignment="Right" Margin="0,8,0,0"/>
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="AI Sentinel" Foreground="#555555" FontSize="11" Margin="0,8,0,0"/>
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SummaryAi}" Foreground="#CCCCCC" FontSize="11" HorizontalAlignment="Right" Margin="0,8,0,0"/>
+
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Kernel Protection" Foreground="#555555" FontSize="11" Margin="0,8,0,0"/>
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SummaryEbpf}" Foreground="#00FF88" FontSize="11" HorizontalAlignment="Right" Margin="0,8,0,0"/>
+                </Grid>
+            </Border>
+
+            <!-- Autostart toggle -->
+            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center" Margin="0,20,0,0">
+                <ToggleSwitch IsChecked="{Binding AutoStartEnabled}"
+                              OnContent="Start on boot" OffContent="Manual start"/>
+            </StackPanel>
+
+            <!-- Launch button -->
+            <Button Classes="Primary" Content="🛡️  Launch AegisDNS"
+                    Command="{Binding LaunchCommand}"
+                    HorizontalAlignment="Center" FontSize="14"
+                    Padding="36,12" Margin="0,24,0,0">
+                <Button.Effect>
+                    <DropShadowEffect Color="Cyan" BlurRadius="12" Opacity="0.4"/>
+                </Button.Effect>
+            </Button>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
+</file>
+
+<file path="src/AegisDNS.Installer/Pages/DnsConfigPage.axaml">
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AegisDNS.Installer.ViewModels"
+             x:Class="AegisDNS.Installer.Pages.DnsConfigPage"
+             x:DataType="vm:InstallerViewModel"
+             Background="#050505">
+    <ScrollViewer Padding="40,30,40,20">
+        <StackPanel Spacing="16">
+            <TextBlock Text="DNS CONFIGURATION" Classes="SectionHeader"/>
+
+            <!-- Provider grid -->
+            <UniformGrid Columns="2" Margin="0,0,0,12">
+                <!-- Cloudflare -->
+                <Border Background="#0D0D0D" BorderBrush="#222222" BorderThickness="1" CornerRadius="6" Padding="14,10" Cursor="Hand" Margin="4">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="☁️ Cloudflare" Foreground="Cyan" FontSize="12" FontWeight="SemiBold"/>
+                        <TextBlock Text="1.1.1.1" Foreground="#555555" FontSize="11"/>
+                        <TextBlock Text="{Binding CloudflareLatency}" Foreground="#00FF88" FontSize="11"/>
+                    </StackPanel>
+                </Border>
+                <!-- Add other providers here if needed, following same pattern -->
+            </UniformGrid>
+
+            <Button Classes="Secondary" Content="Test Latency" Command="{Binding TestLatencyCommand}"/>
+
+            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,8,0,0">
+                <TextBlock Text="Encrypted DNS (DoH):" Foreground="#B0B0B0" FontSize="12" VerticalAlignment="Center"/>
+                <ToggleSwitch IsChecked="{Binding DohEnabled}"
+                              OnContent="Enabled" OffContent="Plain UDP"/>
+            </StackPanel>
+
+            <!-- Custom fields -->
+            <StackPanel Spacing="8" IsVisible="{Binding ShowCustomFields}">
+                <TextBlock Text="CUSTOM DNS" Classes="SectionHeader"/>
+                <TextBox Text="{Binding CustomPrimary}" Watermark="Primary DNS (e.g. 1.1.1.1)"
+                         Background="#0A0A0A" Foreground="Cyan" BorderBrush="#333333" CornerRadius="4"/>
+                <TextBox Text="{Binding CustomSecondary}" Watermark="Secondary DNS (optional)"
+                         Background="#0A0A0A" Foreground="Cyan" BorderBrush="#333333" CornerRadius="4"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
+</file>
+
+<file path="src/AegisDNS.Installer/Pages/InstallProgressPage.axaml">
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AegisDNS.Installer.ViewModels"
+             x:Class="AegisDNS.Installer.Pages.InstallProgressPage"
+             x:DataType="vm:InstallerViewModel"
+             Background="#050505">
+    <Grid RowDefinitions="Auto,*,Auto" Margin="40,30,40,20">
+        <!-- Row 0 -->
+        <StackPanel Grid.Row="0">
+            <Grid>
+                <TextBlock Text="INSTALLING" Classes="SectionHeader"/>
+                <TextBlock Text="{Binding TimeRemaining}" Foreground="#555555" FontSize="11"
+                           HorizontalAlignment="Right" VerticalAlignment="Center"/>
+            </Grid>
+            <ProgressBar Value="{Binding InstallProgress}" Maximum="100"
+                         Height="4" Background="#111111" Foreground="Cyan" CornerRadius="2" Margin="0,10,0,2"/>
+            <TextBlock Text="{Binding InstallProgress, StringFormat='{}{0:F0}%'}"
+                       Foreground="Cyan" FontSize="11" HorizontalAlignment="Right"/>
+        </StackPanel>
+
+        <!-- Row 1 — step list -->
+        <ScrollViewer Grid.Row="1" Margin="0,10">
+            <ItemsControl ItemsSource="{Binding InstallSteps}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:InstallStep">
+                        <Border Margin="0,0,0,4" Padding="14,10" Background="#0D0D0D" CornerRadius="5">
+                            <Grid ColumnDefinitions="28,*,Auto">
+                                <TextBlock Grid.Column="0" Text="{Binding Icon}" FontSize="15" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock Text="{Binding Name}" Foreground="#CCCCCC" FontSize="12" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding Status}" Foreground="#555555" FontSize="11"/>
+                                </StackPanel>
+                                <TextBlock Grid.Column="2" Text="{Binding Elapsed}"
+                                           Foreground="#333333" FontSize="11"
+                                           FontFamily="Consolas,Courier New,monospace" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Row 2 -->
+        <StackPanel Grid.Row="2" Spacing="10" Margin="0,14,0,0">
+            <Button Classes="Primary" Content="Begin Installation"
+                    Command="{Binding StartInstallCommand}"
+                    HorizontalAlignment="Center"
+                    IsVisible="{Binding !InstallComplete}"/>
+            <TextBlock Text="✅ Installation complete — click Continue"
+                       Foreground="#00FF88" FontSize="13" FontWeight="SemiBold"
+                       HorizontalAlignment="Center" IsVisible="{Binding InstallComplete}"/>
+            <TextBlock Text="❌ Installation failed — check step details above"
+                       Foreground="#FF453A" FontSize="13"
+                       HorizontalAlignment="Center" IsVisible="{Binding InstallFailed}"/>
+        </StackPanel>
+    </Grid>
+</UserControl>
+</file>
+
+<file path="src/AegisDNS.Installer/Pages/InstallTypePage.axaml">
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AegisDNS.Installer.ViewModels"
+             x:Class="AegisDNS.Installer.Pages.InstallTypePage"
+             x:DataType="vm:InstallerViewModel"
+             Background="#050505">
+
+  <ScrollViewer Padding="50,36,50,20">
+    <StackPanel Spacing="0">
+
+      <!-- Header -->
+      <TextBlock Text="INSTALLATION TYPE" Foreground="Cyan" FontSize="11"
+                 FontWeight="Bold" LetterSpacing="2" Margin="0,0,0,6"/>
+      <TextBlock Text="Choose how you want AegisDNS installed."
+                 Foreground="#555555" FontSize="12" Margin="0,0,0,28"/>
+
+      <!-- Option cards -->
+      <StackPanel Spacing="10">
+
+        <!-- Card 1 — Recommended -->
+        <Border Background="#071A07" BorderBrush="#1A4A1A"
+                BorderThickness="1" CornerRadius="7" Padding="18,14">
+          <Grid ColumnDefinitions="Auto,*">
+            <RadioButton Grid.Column="0" IsChecked="{Binding RecommendedSelected}"
+                         GroupName="InstallType" VerticalAlignment="Top" Margin="0,2,14,0"/>
+            <StackPanel Grid.Column="1" Spacing="4">
+              <TextBlock Text="⚡  RECOMMENDED" Foreground="#00FF88"
+                         FontSize="13" FontWeight="Bold" LetterSpacing="1"/>
+              <TextBlock Text="Install with optimised defaults for most users."
+                         Foreground="#888888" FontSize="12" TextWrapping="Wrap"/>
+              <TextBlock Text="Installs to /opt/aegisdns — starts on boot — enables eBPF if available"
+                         Foreground="#444444" FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap"/>
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <!-- Card 2 — Custom -->
+        <Border Background="#0A0A0A" BorderBrush="#222222" BorderThickness="1"
+                CornerRadius="7" Padding="18,14">
+          <Grid ColumnDefinitions="Auto,*">
+            <RadioButton Grid.Column="0" IsChecked="{Binding CustomSelected}"
+                         GroupName="InstallType" VerticalAlignment="Top" Margin="0,2,14,0"/>
+            <StackPanel Grid.Column="1" Spacing="4">
+              <TextBlock Text="🔧  CUSTOM" Foreground="Cyan"
+                         FontSize="13" FontWeight="Bold" LetterSpacing="1"/>
+              <TextBlock Text="Configure DNS, AI Sentinel, eBPF, and install path manually."
+                         Foreground="#888888" FontSize="12" TextWrapping="Wrap"/>
+              <TextBlock Text="Advanced users only"
+                         Foreground="#444444" FontSize="11" Margin="0,4,0,0"/>
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <!-- Card 3 — Headless/Server -->
+        <Border Background="#0A0A0A" BorderBrush="#222222" BorderThickness="1"
+                CornerRadius="7" Padding="18,14">
+          <Grid ColumnDefinitions="Auto,*">
+            <RadioButton Grid.Column="0" IsChecked="{Binding HeadlessSelected}"
+                         GroupName="InstallType" VerticalAlignment="Top" Margin="0,2,14,0"/>
+            <StackPanel Grid.Column="1" Spacing="4">
+              <TextBlock Text="🖥️  SERVER / HEADLESS" Foreground="#FFBD2E"
+                         FontSize="13" FontWeight="Bold" LetterSpacing="1"/>
+              <TextBlock Text="No UI — DNS service and web dashboard only. Ideal for router mode."
+                         Foreground="#888888" FontSize="12" TextWrapping="Wrap"/>
+              <TextBlock Text="Requires router mode to be enabled post-install"
+                         Foreground="#444444" FontSize="11" Margin="0,4,0,0"/>
+            </StackPanel>
+          </Grid>
+        </Border>
+
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
+</file>
+
+<file path="src/AegisDNS.Installer/Pages/LicenseActivationPage.axaml">
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AegisDNS.Installer.ViewModels"
+             x:Class="AegisDNS.Installer.Pages.LicenseActivationPage"
+             x:DataType="vm:InstallerViewModel"
+             Background="#050505">
+    <ScrollViewer Padding="50,30,50,20">
+        <StackPanel Spacing="16">
+            <TextBlock Text="LICENSE ACTIVATION" Classes="SectionHeader"/>
+
+            <!-- Machine ID card -->
+            <Border Background="#0D0D0D" CornerRadius="6" Padding="16,12">
+                <StackPanel>
+                    <TextBlock Text="MACHINE ID" Classes="SectionHeader" Margin="0,0,0,8"/>
+                    <TextBlock Text="{Binding MachineHwid}" Foreground="Cyan"
+                               FontFamily="Consolas,Courier New,monospace" FontSize="11"/>
+                    <TextBlock Text="Your license key will be bound to this hardware."
+                               Foreground="#444444" FontSize="10" Margin="0,4,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- License entry card -->
+            <Border Background="#0D0D0D" CornerRadius="6" Padding="16,14">
+                <StackPanel>
+                    <TextBlock Text="LICENSE KEY" Classes="SectionHeader" Margin="0,0,0,10"/>
+                    <TextBox Text="{Binding LicenseKey}"
+                             Watermark="Paste your license key here..."
+                             Background="#0A0A0A" Foreground="Cyan" BorderBrush="#333333"
+                             CornerRadius="4" FontFamily="Consolas,Courier New,monospace" FontSize="12"
+                             Margin="0,0,0,8"/>
+                    <TextBlock Text="{Binding ActivationStatus}"
+                               Foreground="{Binding ActivationColor}" FontSize="11" Margin="0,0,0,10"/>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Classes="Primary" Content="Activate License"
+                                Command="{Binding ActivateCommand}" IsEnabled="{Binding KeyFormatValid}"/>
+                        <Button Classes="Secondary" Content="Skip (Community Edition)"
+                                Command="{Binding SkipLicenseCommand}" Foreground="#555555"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Activated state -->
+            <Border Background="#071A07" BorderBrush="#1A4A1A" BorderThickness="1"
+                    CornerRadius="6" Padding="16,12"
+                    IsVisible="{Binding LicenseActivated}">
+                <TextBlock Foreground="#00FF88" FontSize="14" FontWeight="SemiBold"
+                           Text="{Binding ActivatedEdition, StringFormat='✅ ACTIVATED — {0} Edition'}"/>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
+</file>
+
+<file path="src/AegisDNS.Installer/Pages/LicenseAgreementPage.axaml">
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AegisDNS.Installer.ViewModels"
+             x:Class="AegisDNS.Installer.Pages.LicenseAgreementPage"
+             x:DataType="vm:InstallerViewModel"
+             Background="#050505">
+
+  <Grid RowDefinitions="Auto,*,Auto" Margin="40,30,40,20">
+
+    <!-- Row 0: Header -->
+    <StackPanel Grid.Row="0">
+      <TextBlock Text="LICENSE AGREEMENT" Foreground="Cyan" FontSize="11"
+                 FontWeight="Bold" LetterSpacing="2" Margin="0,0,0,4"/>
+      <TextBlock Text="Please read and accept the terms before continuing."
+                 Foreground="#555555" FontSize="11"/>
+    </StackPanel>
+
+    <!-- Row 1: License text -->
+    <Border Grid.Row="1" Background="#0A0A0A" BorderBrush="#1E1E1E" BorderThickness="1"
+            CornerRadius="6" Margin="0,12,0,12">
+      <ScrollViewer Padding="18,14">
+        <TextBlock TextWrapping="Wrap" Foreground="#555555" FontSize="11"
+                   FontFamily="Consolas,Courier New,monospace" LineHeight="18">
+AegisDNS — End User License Agreement
+
+Copyright (c) 2026 AegisDNS. All rights reserved.
+
+1. GRANT OF LICENSE
+This software is licensed, not sold. You are granted a personal,
+non-transferable license to install and use AegisDNS on machines
+you own or control.
+
+2. RESTRICTIONS
+You may not reverse engineer, decompile, or redistribute this software
+without written permission from the author.
+
+3. PRIVACY
+AegisDNS processes DNS queries locally on your machine. No query data
+is transmitted to AegisDNS servers without your explicit opt-in consent.
+Telemetry is opt-in and described in the Privacy Disclosure document.
+
+4. DISCLAIMER
+THIS SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND.
+THE AUTHOR SHALL NOT BE LIABLE FOR ANY DAMAGES ARISING FROM ITS USE.
+
+5. TERMINATION
+This license is effective until terminated. It terminates automatically
+if you violate any of its terms.
+
+By clicking "I Accept", you agree to be bound by these terms.
+        </TextBlock>
+      </ScrollViewer>
+    </Border>
+
+    <!-- Row 2: Accept controls -->
+    <StackPanel Grid.Row="2" Spacing="10">
+      <CheckBox IsChecked="{Binding LicenseAccepted}"
+                Foreground="#AAAAAA" FontSize="12">
+        I have read and accept the License Agreement
+      </CheckBox>
+      <TextBlock Text="You must accept the terms to continue."
+                 Foreground="#FF453A" FontSize="11"
+                 IsVisible="{Binding !LicenseAccepted}"/>
+    </StackPanel>
+
+  </Grid>
+</UserControl>
+</file>
+
+<file path="src/AegisDNS.Installer/Pages/SystemAuditPage.axaml">
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AegisDNS.Installer.ViewModels"
+             x:Class="AegisDNS.Installer.Pages.SystemAuditPage"
+             x:DataType="vm:InstallerViewModel"
+             Background="#050505">
+    <Grid RowDefinitions="Auto,*,Auto" Margin="40,30,40,20">
+        <!-- Row 0 header -->
+        <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,20">
+            <TextBlock Text="SYSTEM AUDIT" Classes="SectionHeader"/>
+            <TextBlock Text="Verifying prerequisites..." Foreground="#555555" FontSize="11"/>
+        </StackPanel>
+
+        <!-- Row 1 — audit list -->
+        <ScrollViewer Grid.Row="1">
+            <ItemsControl ItemsSource="{Binding AuditItems}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:AuditItem">
+                        <Border Margin="0,0,0,6" Padding="14,10" Background="#0D0D0D" CornerRadius="5">
+                            <Grid ColumnDefinitions="28,*,Auto">
+                                <TextBlock Grid.Column="0" Text="{Binding Status}" FontSize="15" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock Text="{Binding Name}" Foreground="#CCCCCC" FontSize="12" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding Message}" Foreground="#555555" FontSize="11"/>
+                                </StackPanel>
+                                <Ellipse Grid.Column="2" Width="8" Height="8" Fill="{Binding StatusColor}"
+                                         VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Row 2 — status -->
+        <StackPanel Grid.Row="2" Spacing="6" Margin="0,10,0,0">
+            <TextBlock Text="✅ All checks passed — you're good to go"
+                       Foreground="#00FF88" FontSize="12" HorizontalAlignment="Center"
+                       IsVisible="{Binding AuditPassed}"/>
+            <TextBlock Text="⚡ eBPF available — kernel protection will be enabled"
+                       Foreground="Cyan" FontSize="11" HorizontalAlignment="Center"
+                       IsVisible="{Binding EbpfAvailable}"/>
+        </StackPanel>
+    </Grid>
+</UserControl>
+</file>
+
+<file path="src/AegisDNS.Installer/Pages/WelcomePage.axaml">
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AegisDNS.Installer.ViewModels"
+             x:Class="AegisDNS.Installer.Pages.WelcomePage"
+             x:DataType="vm:InstallerViewModel"
+             Background="#050505">
+    <ScrollViewer Padding="50,40,50,20">
+        <StackPanel Spacing="0">
+            <!-- Logo block -->
+            <TextBlock Text="⬡" FontSize="52" Foreground="Cyan" HorizontalAlignment="Center">
+                <TextBlock.Effect>
+                    <DropShadowEffect Color="Cyan" BlurRadius="24" Opacity="0.6"/>
+                </TextBlock.Effect>
+            </TextBlock>
+            <TextBlock Text="AegisDNS" FontSize="36" FontWeight="Bold" Foreground="Cyan"
+                       HorizontalAlignment="Center" LetterSpacing="4" Margin="0,8,0,4">
+                <TextBlock.Effect>
+                    <DropShadowEffect Color="Cyan" BlurRadius="16" Opacity="0.4"/>
+                </TextBlock.Effect>
+            </TextBlock>
+            <TextBlock Text="AI-Powered DNS Privacy Shield" Foreground="#555555" FontSize="13"
+                       HorizontalAlignment="Center" Margin="0,0,0,32"/>
+
+            <!-- Hardware info card -->
+            <Border Background="#111111" BorderBrush="#1E1E1E" BorderThickness="1"
+                    CornerRadius="8" Padding="20,14" Margin="0,0,0,28">
+                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,*">
+                    <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4">
+                        <TextBlock Text="{Binding DetectedDistro, StringFormat='🐧 {0}'}" Foreground="#CCCCCC" FontSize="12"/>
+                        <TextBlock Text="{Binding KernelVersion, StringFormat='⚙️ {0}'}" Foreground="#888888" FontSize="11"/>
+                    </StackPanel>
+                    <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4" HorizontalAlignment="Right">
+                        <TextBlock Text="{Binding RamInfo, StringFormat='💾 {0}'}" Foreground="#CCCCCC" FontSize="12"/>
+                        <TextBlock Text="{Binding CpuInfo, StringFormat='🖥️ {0}'}" Foreground="#888888" FontSize="11"/>
+                    </StackPanel>
+                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding InstallerHash}"
+                               Foreground="#333333" FontSize="10" FontFamily="Consolas,Courier New,monospace"
+                               HorizontalAlignment="Center" Margin="0,12,0,0"/>
+                </Grid>
+            </Border>
+
+            <!-- Mode selection -->
+            <Grid ColumnDefinitions="*,16,*">
+                <!-- Express card -->
+                <Border Grid.Column="0" Background="#071A07" BorderBrush="#1A4A1A" BorderThickness="1" CornerRadius="8" Padding="20">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="⚡ EXPRESS" Foreground="#00FF88" FontSize="14" FontWeight="Bold" LetterSpacing="1"/>
+                        <TextBlock Text="Recommended defaults. Done in 3 minutes." Foreground="#888888" FontSize="12" TextWrapping="Wrap"/>
+                        <Button Classes="Primary" Content="Express Install"
+                                Command="{Binding ExpressCommand}" HorizontalAlignment="Stretch"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Advanced card -->
+                <Border Grid.Column="2" Background="#0A0A0A" BorderBrush="#222222" BorderThickness="1" CornerRadius="8" Padding="20">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="🔧 ADVANCED" Foreground="Cyan" FontSize="14" FontWeight="Bold" LetterSpacing="1"/>
+                        <TextBlock Text="Configure every option: DNS, AI, eBPF and more." Foreground="#888888" FontSize="12" TextWrapping="Wrap"/>
+                        <Button Classes="Secondary" Content="Advanced Setup"
+                                Command="{Binding AdvancedCommand}" HorizontalAlignment="Stretch"
+                                Foreground="Cyan" BorderBrush="#003333"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <TextBlock Text="Alpha Test 0.0.2  ·  Linux-First Build" Foreground="#2A2A2A" FontSize="10"
+                       HorizontalAlignment="Center" Margin="0,20,0,0"/>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
+</file>
+
+<file path="src/AegisDNS.Installer/App.axaml">
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AegisDNS.Installer.App"
+             RequestedThemeVariant="Dark">
+    <Application.Styles>
+        <FluentTheme />
+    </Application.Styles>
+</Application>
+</file>
+
+<file path="src/AegisDNS.Installer/MainWindow.axaml">
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:AegisDNS.Installer.ViewModels"
+        xmlns:pages="using:AegisDNS.Installer.Pages"
+        x:Class="AegisDNS.Installer.MainWindow"
+        x:DataType="vm:InstallerViewModel"
+        Title="AegisDNS Installer"
+        Width="900" Height="620"
+        MinWidth="900" MinHeight="620"
+        Background="#050505"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="-1"
+        TransparencyLevelHint="Transparent"
+        SystemDecorations="None">
+
+  <Window.Styles>
+    <Style Selector="Button.TrafficLight">
+      <Setter Property="Width" Value="14"/>
+      <Setter Property="Height" Value="14"/>
+      <Setter Property="CornerRadius" Value="7"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="TextBlock.SectionHeader">
+      <Setter Property="Foreground" Value="Cyan"/>
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="FontWeight" Value="Bold"/>
+      <Setter Property="LetterSpacing" Value="2"/>
+    </Style>
+    <Style Selector="Button.Primary">
+      <Setter Property="Background" Value="#006666"/>
+      <Setter Property="Foreground" Value="Cyan"/>
+      <Setter Property="BorderBrush" Value="Cyan"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="4"/>
+      <Setter Property="Padding" Value="24,10"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button.Secondary">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Foreground" Value="#888888"/>
+      <Setter Property="BorderBrush" Value="#333333"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="4"/>
+      <Setter Property="Padding" Value="24,10"/>
+      <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="45,*,60" Background="#050505">
+
+    <!-- ── Title bar ── -->
+    <Grid Grid.Row="0" Background="#111111" PointerPressed="TitleBar_PointerPressed">
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Left"
+                  VerticalAlignment="Center" Margin="15,0,0,0" Spacing="8">
+        <Button Classes="TrafficLight" Background="#FF5F56" Click="CloseBtn_Click"/>
+        <Button Classes="TrafficLight" Background="#FFBD2E" Click="MinBtn_Click"/>
+        <Button Classes="TrafficLight" Background="#3A3A3A" IsEnabled="False"/>
+      </StackPanel>
+
+      <TextBlock Text="🛡️ AegisDNS — Installation Wizard"
+                 Foreground="Cyan" FontWeight="Bold" FontSize="13"
+                 VerticalAlignment="Center" HorizontalAlignment="Center"
+                 IsHitTestVisible="False">
+        <TextBlock.Effect>
+          <DropShadowEffect Color="Cyan" BlurRadius="10" Opacity="0.5"/>
+        </TextBlock.Effect>
+      </TextBlock>
+
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                  VerticalAlignment="Center" Margin="0,0,20,0" Spacing="6"
+                  x:Name="PageDots"/>
+    </Grid>
+
+    <!-- ── Page content ── -->
+    <Border Grid.Row="1" ClipToBounds="True">
+      <TransitioningContentControl x:Name="PageHost">
+        <TransitioningContentControl.PageTransition>
+          <PageSlide Duration="0:0:0.25" Orientation="Horizontal"/>
+        </TransitioningContentControl.PageTransition>
+      </TransitioningContentControl>
+    </Border>
+
+    <!-- ── Navigation bar ── -->
+    <Border Grid.Row="2" Background="#111111" BorderBrush="#1A1A1A" BorderThickness="0,1,0,0">
+      <Grid Margin="24,0">
+        <Button Classes="Secondary" Content="← Back"
+                Command="{Binding BackCommand}"
+                IsVisible="{Binding CanGoBack}"
+                HorizontalAlignment="Left" VerticalAlignment="Center"/>
+
+        <TextBlock Text="{Binding CurrentPageIndex, StringFormat='Step {0} of 8'}"
+                   Foreground="#555555" FontSize="11"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+        <Button Classes="Primary" Content="Continue →"
+                Command="{Binding NextCommand}"
+                IsVisible="{Binding CanGoNext}"
+                HorizontalAlignment="Right" VerticalAlignment="Center"/>
+      </Grid>
+    </Border>
+
+  </Grid>
+</Window>
+</file>
+
+<file path="src/AegisDNS.Installer/Pages/AiConfigPage.axaml.cs">
+using AegisDNS.Installer.ViewModels;
+
+using Avalonia.Controls;
+
+namespace AegisDNS.Installer.Pages;
+
+public partial class AiConfigPage : UserControl
+{
+    public AiConfigPage()
+    {
+        InitializeComponent();
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Installer/Pages/CompletePage.axaml.cs">
+using AegisDNS.Installer.ViewModels;
+
+using Avalonia.Controls;
+
+namespace AegisDNS.Installer.Pages;
+
+public partial class CompletePage : UserControl
+{
+    public CompletePage()
+    {
+        InitializeComponent();
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Installer/Pages/DnsConfigPage.axaml.cs">
+using AegisDNS.Installer.ViewModels;
+
+using Avalonia.Controls;
+
+namespace AegisDNS.Installer.Pages;
+
+public partial class DnsConfigPage : UserControl
+{
+    public DnsConfigPage()
+    {
+        InitializeComponent();
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Installer/Pages/InstallProgressPage.axaml.cs">
+using AegisDNS.Installer.ViewModels;
+
+using Avalonia.Controls;
+
+namespace AegisDNS.Installer.Pages;
+
+public partial class InstallProgressPage : UserControl
+{
+    public InstallProgressPage()
+    {
+        InitializeComponent();
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Installer/Pages/InstallTypePage.axaml.cs">
+using Avalonia.Controls;
+
+namespace AegisDNS.Installer.Pages;
+
+public partial class InstallTypePage : UserControl
+{
+    public InstallTypePage() => InitializeComponent();
+}
+</file>
+
+<file path="src/AegisDNS.Installer/Pages/LicenseActivationPage.axaml.cs">
+using AegisDNS.Installer.ViewModels;
+
+using Avalonia.Controls;
+
+namespace AegisDNS.Installer.Pages;
+
+public partial class LicenseActivationPage : UserControl
+{
+    public LicenseActivationPage()
+    {
+        InitializeComponent();
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Installer/Pages/LicenseAgreementPage.axaml.cs">
+using Avalonia.Controls;
+
+namespace AegisDNS.Installer.Pages;
+
+public partial class LicenseAgreementPage : UserControl
+{
+    public LicenseAgreementPage() => InitializeComponent();
+}
+</file>
+
+<file path="src/AegisDNS.Installer/Pages/SystemAuditPage.axaml.cs">
+using AegisDNS.Installer.ViewModels;
+
+using Avalonia.Controls;
+
+namespace AegisDNS.Installer.Pages;
+
+public partial class SystemAuditPage : UserControl
+{
+    public SystemAuditPage()
+    {
+        InitializeComponent();
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Installer/Pages/WelcomePage.axaml.cs">
+using AegisDNS.Installer.ViewModels;
+
+using Avalonia.Controls;
+
+namespace AegisDNS.Installer.Pages;
+
+public partial class WelcomePage : UserControl
+{
+    public WelcomePage()
+    {
+        InitializeComponent();
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Installer/App.axaml.cs">
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Markup.Xaml;
+
+namespace AegisDNS.Installer;
+
+public partial class App : Application
+{
+    public override void Initialize()
+    {
+        AvaloniaXamlLoader.Load(this);
+    }
+
+    public override void OnFrameworkInitializationCompleted()
+    {
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            desktop.MainWindow = new MainWindow();
+        }
+
+        base.OnFrameworkInitializationCompleted();
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Installer/MainWindow.axaml.cs">
+using AegisDNS.Installer.Pages;
+using AegisDNS.Installer.ViewModels;
+
+using Avalonia.Controls;
+using Avalonia.Input;
+
+namespace AegisDNS.Installer;
+
+public partial class MainWindow : Window
+{
+    public MainWindow()
+    {
+        InitializeComponent();
+        DataContext = new InstallerViewModel();
+
+        if (DataContext is InstallerViewModel vm)
+        {
+            vm.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(InstallerViewModel.CurrentPage))
+                {
+                    UpdatePageContent(vm.CurrentPage);
+                    UpdatePageDots(vm);
+                }
+            };
+            UpdatePageContent(vm.CurrentPage);
+            UpdatePageDots(vm);
+        }
+    }
+
+    private void UpdatePageContent(InstallerPage page)
+    {
+        var host = this.FindControl<TransitioningContentControl>("PageHost");
+        if (host == null) return;
+
+        host.Content = page switch
+        {
+            InstallerPage.Welcome => (Control)new WelcomePage { DataContext = DataContext },
+            InstallerPage.LicenseAgreement => new LicenseAgreementPage { DataContext = DataContext },
+            InstallerPage.InstallType => new InstallTypePage { DataContext = DataContext },
+            InstallerPage.SystemAudit => new SystemAuditPage { DataContext = DataContext },
+            InstallerPage.LicenseActivation => new LicenseActivationPage { DataContext = DataContext },
+            InstallerPage.DnsConfig => new DnsConfigPage { DataContext = DataContext },
+            InstallerPage.AiConfig => new AiConfigPage { DataContext = DataContext },
+            InstallerPage.InstallProgress => new InstallProgressPage { DataContext = DataContext },
+            InstallerPage.Complete => new CompletePage { DataContext = DataContext },
+            _ => new WelcomePage { DataContext = DataContext }
+        };
+    }
+
+    private void UpdatePageDots(InstallerViewModel vm)
+    {
+        var dots = this.FindControl<StackPanel>("PageDots");
+        if (dots == null) return;
+        dots.Children.Clear();
+        for (int i = 0; i < 9; i++)
+        {
+            dots.Children.Add(new Avalonia.Controls.Shapes.Ellipse
+            {
+                Width = 6,
+                Height = 6,
+                Fill = new Avalonia.Media.SolidColorBrush(
+                    i == vm.CurrentPageIndex
+                        ? Avalonia.Media.Color.Parse("#00FFFF")
+                        : Avalonia.Media.Color.Parse("#333333"))
+            });
+        }
+    }
+
+    private void TitleBar_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            BeginMoveDrag(e);
+    }
+
+    private void CloseBtn_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close();
+    private void MinBtn_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => WindowState = WindowState.Minimized;
+}
+</file>
+
+<file path="src/AegisDNS.Installer/Program.cs">
+using System;
+using System.Diagnostics;
+using System.Linq;
+using System.Runtime.InteropServices;
+
+using Avalonia;
+using Avalonia.ReactiveUI;
+
+namespace AegisDNS.Installer;
+
+class Program
+{
+    [STAThread]
+    public static void Main(string[] args)
+    {
+        // 1. Check for --elevated flag
+        if (!args.Contains("--elevated") && !Environment.IsPrivilegedProcess)
+        {
+            if (TryElevateLinux()) return;
+        }
+
+        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+    }
+    private static bool TryElevateLinux()
+    {
+        try
+        {
+            string exePath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
+            if (string.IsNullOrEmpty(exePath)) return false;
+
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "gnome-terminal",
+                UseShellExecute = false,
+                CreateNoWindow = false
+            };
+            startInfo.ArgumentList.Add("--");
+            startInfo.ArgumentList.Add("bash");
+            startInfo.ArgumentList.Add("-c");
+            startInfo.ArgumentList.Add($"sudo \"{exePath}\" --elevated; exec bash");
+
+            Process.Start(startInfo);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Elevation failed: {ex.Message}");
+            return false;
+        }
+    }
+    public static AppBuilder BuildAvaloniaApp()
+        => AppBuilder.Configure<App>()
+            .UsePlatformDetect()
+            .LogToTrace()
+            .UseReactiveUI();
+}
+</file>
+
+<file path="src/AegisDNS.Installer/Services/InstallService.cs">
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks;
+
+using AegisDNS.Core.Ai;
+using AegisDNS.Installer.ViewModels;
+
+namespace AegisDNS.Installer.Services;
+
+/// <summary>
+/// Performs the full AegisDNS installation.
+/// Mirrors installer/install.sh step-by-step in managed C#.
+/// Must run as root (enforced by Program.cs pkexec elevation).
+/// </summary>
+public class InstallService
+{
+    private const string InstallDir = "/opt/AegisDNS";
+    private const string ServiceDir = "/opt/AegisDNS/Service";
+    private const string ConfigDir = "/etc/aegisdns";
+    private const string LogDir = "/var/log/aegisdns";
+    private const string BackupDir = "/var/lib/aegisdns/backup";
+    private const string ServiceFile = "/etc/systemd/system/aegisdns.service";
+    private const string DesktopFile = "/usr/share/applications/aegisdns.desktop";
+
+    // AppImage unpacks next to the installer binary
+    private static readonly string AppDir =
+        Path.GetDirectoryName(Environment.ProcessPath ?? "/usr/bin/AegisDNS.Installer") ?? throw new InvalidOperationException(
+            "RuntimeDirectory is not set. Cannot determine safe install path.");
+
+    private readonly InstallerViewModel _vm;
+    private readonly Stopwatch _stepTimer = new();
+
+    public InstallService(InstallerViewModel vm) => _vm = vm;
+
+    public async Task RunAsync()
+    {
+        await Step(0, "Create directories", CreateDirectoriesAsync);
+        await Step(1, "Copy binaries", CopyBinariesAsync);
+        await Step(2, "Compile eBPF protection", CompileEbpfAsync);
+        await Step(3, "Install systemd service", InstallServiceAsync);
+        await Step(4, "Configure DNS upstream", ConfigureDnsAsync);
+        await Step(5, "Write AI config", WriteAiConfigAsync);
+        await Step(6, "Desktop integration", InstallDesktopAsync);
+        await Step(7, "Free port 53", DisableResolvedStubAsync);
+        await Step(8, "Start service", StartServiceAsync);
+        await Step(9, "Restore license", RestoreLicenseAsync);
+    }
+
+    private async Task Step(int index, string name, Func<Task> action)
+    {
+        _stepTimer.Restart();
+        try
+        {
+            await action();
+            _vm.ReportStep(index, "Complete", $"{_stepTimer.Elapsed.TotalSeconds:F1}s");
+        }
+        catch (Exception ex)
+        {
+            _vm.FailStep(index, ex.Message);
+            throw;
+        }
+    }
+
+    // ── Step 0: Create directories ────────────────────────────────────────────
+
+    private Task CreateDirectoriesAsync()
+    {
+        // InstallDir must be world-traversable so any user can execute AegisDNSUI
+        Directory.CreateDirectory(InstallDir);
+        Chmod(InstallDir, "755");
+
+        foreach (var dir in new[] { ServiceDir, ConfigDir, LogDir, BackupDir,
+                                    "/var/lib/aegisdns/policies" })
+        {
+            Directory.CreateDirectory(dir);
+            Chmod(dir, "750");
+        }
+        return Task.CompletedTask;
+    }
+
+    // ── Step 1: Copy binaries ─────────────────────────────────────────────────
+
+    private async Task CopyBinariesAsync()
+    {
+        // Backup existing DNS config before touching anything
+        if (File.Exists("/etc/resolv.conf"))
+            File.Copy("/etc/resolv.conf", Path.Combine(BackupDir, "resolv.conf.bak"), overwrite: true);
+        if (File.Exists("/etc/hosts"))
+            File.Copy("/etc/hosts", Path.Combine(BackupDir, "hosts.bak"), overwrite: true);
+
+        // Stop any existing instance
+        await RunAsyncWithArgumentList("systemctl", new[] { "stop", "aegisdns" }, ignoreErrors: true);
+        await RunAsyncWithArgumentList("pkill", new[] { "-f", "AegisDNSUI" }, ignoreErrors: true);
+        await RunAsyncWithArgumentList("pkill", new[] { "-f", "AegisDNS.Service" }, ignoreErrors: true);
+        await Task.Delay(500);
+
+        // ── Copy UI binary ────────────────────────────────────────────────────
+        // Canonical install path: /opt/AegisDNS/UI/AegisDNSUI  (AppRun expects this)
+        string uiSubDir     = Path.Combine(InstallDir, "UI");
+        Directory.CreateDirectory(uiSubDir);
+        string uiBinaryDest = Path.Combine(uiSubDir, "AegisDNSUI");
+
+        // Priority 1: single self-contained binary alongside the installer
+        string uiBinarySrc  = Path.Combine(AppDir, "AegisDNSUI");
+        if (File.Exists(uiBinarySrc))
+        {
+            File.Copy(uiBinarySrc, uiBinaryDest, overwrite: true);
+        }
+        else
+        {
+            // Priority 2: AppImage layout  $APPDIR/usr/bin/AegisDNSUI
+            string uiBinSrc2 = Path.Combine(AppDir, "usr", "bin", "AegisDNSUI");
+            if (File.Exists(uiBinSrc2))
+            {
+                File.Copy(uiBinSrc2, uiBinaryDest, overwrite: true);
+            }
+            else
+            {
+                // Priority 3: AppImage layout  usr/bin/UI/<files>
+                string uiDirSrc = Path.Combine(AppDir, "usr", "bin", "UI");
+                if (Directory.Exists(uiDirSrc))
+                    CopyDirectory(uiDirSrc, uiSubDir);
+                else
+                {
+                    // Priority 4: dotnet publish output  publish/UI/<files>
+                    string publishUi = Path.Combine(AppDir, "publish", "UI");
+                    if (Directory.Exists(publishUi))
+                        CopyDirectory(publishUi, uiSubDir);
+                }
+            }
+        }
+
+        // Ensure the UI binary has correct permissions immediately after copy
+        if (File.Exists(uiBinaryDest))
+        {
+            Chmod(uiBinaryDest, "755");
+            await RunAsyncWithArgumentList("chown", new[] { "root:root", uiBinaryDest }, ignoreErrors: true);
+        }
+
+        // ── Copy Service binary ───────────────────────────────────────────────
+        // Priority 1: single self-contained binary alongside the installer
+        string svcBinarySrc  = Path.Combine(AppDir, "AegisDNS.Service");
+        string svcExe        = Path.Combine(ServiceDir, "AegisDNS.Service");
+        if (File.Exists(svcBinarySrc))
+        {
+            File.Copy(svcBinarySrc, svcExe, overwrite: true);
+        }
+        else
+        {
+            // Priority 2: AppImage layout  $APPDIR/usr/bin/AegisDNS.Service
+            string svcBinSrc2 = Path.Combine(AppDir, "usr", "bin", "AegisDNS.Service");
+            if (File.Exists(svcBinSrc2))
+            {
+                File.Copy(svcBinSrc2, svcExe, overwrite: true);
+            }
+            else
+            {
+                // Priority 3: AppImage layout  usr/bin/Service/<files>
+                string svcSrc = Path.Combine(AppDir, "usr", "bin", "Service");
+                if (Directory.Exists(svcSrc))
+                    CopyDirectory(svcSrc, ServiceDir);
+                else
+                {
+                    // Priority 4: dotnet publish output  publish/Service/<files>
+                    string publishSvc = Path.Combine(AppDir, "publish", "Service");
+                    if (Directory.Exists(publishSvc))
+                        CopyDirectory(publishSvc, ServiceDir);
+                }
+            }
+        }
+
+        // Make Service binary executable
+        if (File.Exists(svcExe))
+        {
+            Chmod(svcExe, "755");
+            await RunAsyncWithArgumentList("chown", new[] { "root:root", svcExe }, ignoreErrors: true);
+        }
+
+        Chmod(ServiceDir, "750");
+        await RunAsyncWithArgumentList("chown", new[] { "-R", "root:root", ServiceDir }, ignoreErrors: true);
+
+        // ── Fix activation.token ownership ────────────────────────────────────
+        // The token lives in the REAL user's XDG_DATA_HOME, but the installer
+        // runs as root (via pkexec/sudo). If the token file was written under
+        // the root context it will be owned by root and unreadable by the UI
+        // process (which runs as the normal user). Re-chown it here.
+        string? realUser = GetRealUserName();
+        if (realUser != null)
+        {
+            // Resolve the user's home directory from /etc/passwd so we don't
+            // rely on HOME (which may still point to /root when under pkexec).
+            string userHome = GetHomeForUser(realUser);
+            string xdgData  = Path.Combine(userHome, ".local", "share");
+            string tokenPath = Path.Combine(xdgData, "AegisDNS", "activation.token");
+
+            // Ensure the directory exists
+            Directory.CreateDirectory(Path.GetDirectoryName(tokenPath)!);
+
+            if (File.Exists(tokenPath))
+            {
+                await RunAsyncWithArgumentList("chown", new[] { $"{realUser}:{realUser}", tokenPath }, ignoreErrors: true);
+                Chmod(tokenPath, "600");
+            }
+        }
+    }
+
+    // ── Step 2: Compile eBPF ──────────────────────────────────────────────────
+
+    private async Task CompileEbpfAsync()
+    {
+        if (!_vm.EbpfAvailable)
+        {
+            await InstallIptablesFallbackAsync();
+            return;
+        }
+
+        string kernelDir = Path.Combine(AppDir, "kernel");
+        if (!Directory.Exists(kernelDir))
+        {
+            await InstallIptablesFallbackAsync();
+            return;
+        }
+
+        // Generate vmlinux.h from running kernel BTF
+        var (btfExit, btfOutput, _) = await RunCapture("bpftool", new[] { "btf", "dump", "file", "/sys/kernel/btf/vmlinux", "format", "c" });
+        if (btfExit == 0 && !string.IsNullOrEmpty(btfOutput))
+            await File.WriteAllTextAsync(Path.Combine(kernelDir, "vmlinux.h"), btfOutput);
+
+        if (!File.Exists(Path.Combine(kernelDir, "vmlinux.h")))
+        {
+            await InstallIptablesFallbackAsync();
+            return;
+        }
+
+        // Compile eBPF program
+        var (exitCode, _, _) = await RunCapture("make", new[] { "-C", kernelDir, "aegisdns.bpf.o" });
+        if (exitCode != 0)
+        {
+            await InstallIptablesFallbackAsync();
+            return;
+        }
+
+        string objPath = Path.Combine(kernelDir, "aegisdns.bpf.o");
+        if (!File.Exists(objPath))
+        {
+            await InstallIptablesFallbackAsync();
+            return;
+        }
+
+        // Deploy compiled object
+        Directory.CreateDirectory(Path.Combine(ServiceDir, "kernel"));
+        File.Copy(objPath, Path.Combine(ServiceDir, "kernel", "aegisdns.bpf.o"), overwrite: true);
+        Chmod(Path.Combine(ServiceDir, "kernel", "aegisdns.bpf.o"), "644");
+
+        // BPF pin directory
+        Directory.CreateDirectory("/sys/fs/bpf/aegisdns");
+
+        // Mount BPF filesystem on boot
+        const string bpfFstab = "bpf    /sys/fs/bpf    bpf    defaults    0 0";
+        string fstab = File.ReadAllText("/etc/fstab");
+        if (!fstab.Contains("/sys/fs/bpf"))
+            File.AppendAllText("/etc/fstab", "\n" + bpfFstab + "\n");
+
+        // Try XDP ingress shield
+        string xdpDir = Path.Combine(AppDir, "xdp");
+        if (Directory.Exists(xdpDir) && File.Exists(Path.Combine(xdpDir, "aegis_xdp.c")))
+        {
+            var (xdpExit, _, _) = await RunCapture("make", new[] { "-C", xdpDir, "aegis_xdp.o" });
+            if (xdpExit == 0 && File.Exists(Path.Combine(xdpDir, "aegis_xdp.o")))
+            {
+                Directory.CreateDirectory(Path.Combine(ServiceDir, "xdp"));
+                File.Copy(Path.Combine(xdpDir, "aegis_xdp.o"),
+                          Path.Combine(ServiceDir, "xdp", "aegis_xdp.o"), overwrite: true);
+                Chmod(Path.Combine(ServiceDir, "xdp", "aegis_xdp.o"), "644");
+            }
+        }
+
+        // Clean up any old iptables rules
+        await CleanupOldIptablesAsync();
+    }
+
+    private async Task InstallIptablesFallbackAsync()
+    {
+        // iptables redirect — same as install.sh fallback
+        await RunAsyncWithArgumentList("iptables", new[] { "-t", "nat", "-A", "OUTPUT", "-p", "udp", "--dport", "53", "-m", "owner", "--uid-owner", "0", "-j", "RETURN" }, ignoreErrors: true);
+        await RunAsyncWithArgumentList("iptables", new[] { "-t", "nat", "-A", "OUTPUT", "-p", "tcp", "--dport", "53", "-m", "owner", "--uid-owner", "0", "-j", "RETURN" }, ignoreErrors: true);
+        await RunAsyncWithArgumentList("iptables", new[] { "-t", "nat", "-A", "OUTPUT", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53" }, ignoreErrors: true);
+        await RunAsyncWithArgumentList("iptables", new[] { "-t", "nat", "-A", "OUTPUT", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53" }, ignoreErrors: true);
+        await RunAsyncWithArgumentList("ip6tables", new[] { "-t", "nat", "-A", "OUTPUT", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53" }, ignoreErrors: true);
+        await RunAsyncWithArgumentList("ip6tables", new[] { "-t", "nat", "-A", "OUTPUT", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53" }, ignoreErrors: true);
+        await RunAsyncWithArgumentList("iptables", new[] { "-A", "INPUT", "-p", "udp", "--dport", "53", "-j", "ACCEPT" }, ignoreErrors: true);
+        await RunAsyncWithArgumentList("iptables", new[] { "-A", "INPUT", "-p", "tcp", "--dport", "53", "-j", "ACCEPT" }, ignoreErrors: true);
+
+        // Persist rules using the distro-appropriate tool
+        if (File.Exists("/etc/debian_version"))
+            await RunAsyncWithArgumentList("netfilter-persistent", new[] { "save" }, ignoreErrors: true);
+        else
+            await RunAsyncWithArgumentList("service", new[] { "iptables", "save" }, ignoreErrors: true);
+    }
+
+    private async Task CleanupOldIptablesAsync()
+    {
+        await RunAsyncWithArgumentList("iptables", new[] { "-t", "nat", "-D", "OUTPUT", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53" }, ignoreErrors: true);
+        await RunAsyncWithArgumentList("iptables", new[] { "-t", "nat", "-D", "OUTPUT", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53" }, ignoreErrors: true);
+        await RunAsyncWithArgumentList("ip6tables", new[] { "-t", "nat", "-D", "OUTPUT", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53" }, ignoreErrors: true);
+        await RunAsyncWithArgumentList("ip6tables", new[] { "-t", "nat", "-D", "OUTPUT", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "53" }, ignoreErrors: true);
+        await RunAsyncWithArgumentList("nft", new[] { "delete", "table", "inet", "aegisdns" }, ignoreErrors: true);
+    }
+
+    // ── Step 3: Install systemd service ──────────────────────────────────────
+
+    private async Task InstallServiceAsync()
+    {
+        var unit = $"""
+[Unit]
+Description=AegisDNS AI-Powered DNS Interceptor Service
+Documentation=https://aegisdns.com
+After=network-online.target sys-fs-bpf.mount
+Wants=network-online.target sys-fs-bpf.mount
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+ExecStart=/opt/AegisDNS/Service/AegisDNS.Service
+WorkingDirectory=/opt/AegisDNS/Service
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/var/log/aegisdns/service.log
+StandardError=append:/var/log/aegisdns/service.error.log
+User=root
+Group=only
+Environment=AEGIS_UI_USER=only
+RuntimeDirectory=aegisdns
+RuntimeDirectoryMode=0750
+LimitNOFILE=65536
+LimitNPROC=4096
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_NET_RAW CAP_BPF
+AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_BPF
+ExecStopPost=/bin/sh -c 'resolvectl dns enp4s0 8.8.8.8 8.8.4.4 && resolvectl domain enp4s0 "~." && resolvectl flush-caches'
+
+[Install]
+WantedBy=multi-user.target
+""";
+        await File.WriteAllTextAsync(ServiceFile, unit);
+        await RunAsyncWithArgumentList("systemctl", new[] { "daemon-reload" });
+        // Do NOT enable or start the service here.
+        // The UI's Activate/Deactivate button controls start/stop/enable/disable.
+    }
+
+    // ── Step 4: Configure DNS upstream ───────────────────────────────────────
+
+    private async Task ConfigureDnsAsync()
+    {
+        string upstreamIp = _vm.SelectedUpstream switch
+        {
+            "Google" => "8.8.8.8",
+            "Quad9" => "9.9.9.9",
+            "OpenDNS" => "208.67.222.222",
+            "Custom" => _vm.CustomPrimary,
+            _ => "1.1.1.1"   // Cloudflare default
+        };
+
+        // Write AegisDNS upstream config only.
+        // System DNS is NOT touched here — it is switched to 127.0.0.1
+        // in StartServiceAsync() only after the service is confirmed healthy.
+        Directory.CreateDirectory(ConfigDir);
+        await File.WriteAllTextAsync(Path.Combine(ConfigDir, "upstream.conf"),
+            $"UPSTREAM_DNS={upstreamIp}\nDOH_ENABLED={(_vm.DohEnabled ? "1" : "0")}\n");
+    }
+
+    // ── Step 5: Write AI config ───────────────────────────────────────────────
+
+    private async Task WriteAiConfigAsync()
+    {
+        string aiConfigDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".config", "AegisDNS");
+        Directory.CreateDirectory(aiConfigDir);
+        string aiConfigFile = Path.Combine(aiConfigDir, "Ai.config");
+
+        if (!File.Exists(aiConfigFile))
+        {
+            var config = new AiConfig
+            {
+                EnableAiSentinel = _vm.AiProvider != "None",
+                AiProvider = _vm.AiProvider == "None" ? "Ollama" : _vm.AiProvider,
+                AiEndpoint = "http://localhost:11434",
+                AiModel = string.IsNullOrWhiteSpace(_vm.AiModel) ? "llama3" : _vm.AiModel,
+                AiApiKey = _vm.AiApiKey,
+                AiCheckIntervalMinutes = 2,
+                FallbackProviders = new List<string>()
+            };
+
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string json = JsonSerializer.Serialize(config, options);
+            await File.WriteAllTextAsync(aiConfigFile, json);
+        }
+    }
+
+    // ── Step 6: Desktop integration ───────────────────────────────────────────
+
+    private async Task InstallDesktopAsync()
+    {
+        var desktop = $"""
+[Desktop Entry]
+Version=1.0
+Name=AegisDNS
+GenericName=DNS Security Shield
+Comment=AI-Powered DNS Interceptor and Threat Shield
+Exec={InstallDir}/UI/AegisDNSUI
+Icon=network-wired
+Type=Application
+Terminal=false
+Categories=Network;Security;Settings;System;
+Keywords=DNS;Security;Firewall;Privacy;AI;Blocker;
+StartupNotify=true
+""";
+        await File.WriteAllTextAsync(DesktopFile, desktop);
+        await RunAsyncWithArgumentList("update-desktop-database", new[] { "/usr/share/applications" }, ignoreErrors: true);
+
+        // CLI symlink
+        string symlink = "/usr/local/bin/aegisdns-ui";
+        if (File.Exists(symlink)) File.Delete(symlink);
+        await RunAsyncWithArgumentList("ln", new[] { "-sf", $"{InstallDir}/UI/AegisDNSUI", symlink }, ignoreErrors: true);
+    }
+
+    // ── Step 7: Start service ─────────────────────────────────────────────────
+
+    private async Task StartServiceAsync()
+    {
+        // Detect the primary interface for resolvectl
+        string iface = "enp4s0"; // safe fallback
+
+        await RunAsyncWithArgumentList("systemctl", new[] { "start", "aegisdns" });
+
+        // Wait for service to be healthy before touching DNS
+        bool healthy = false;
+        for (int i = 0; i < 10; i++)
+        {
+            await Task.Delay(1000);
+            var (rc, stdout, _) = await RunCapture("systemctl", new[] { "is-active", "aegisdns" });
+            if (rc == 0 && stdout.Trim() == "active")
+            {
+                healthy = true;
+                break;
+            }
+        }
+
+        if (!healthy)
+        {
+            // Service failed to start — do NOT touch DNS
+            throw new Exception("AegisDNS service failed to start. DNS was not modified.");
+        }
+
+        // Service confirmed healthy — now safe to switch DNS
+        var (resolvectlRc, _, _) = await RunCapture("resolvectl", new[] { "status" });
+        if (resolvectlRc == 0)
+        {
+            await RunAsyncWithArgumentList("resolvectl",
+                new[] { "dns", iface, "127.0.0.1" }, ignoreErrors: false);
+        }
+    }
+
+    // ── Step 8: Restore license token ────────────────────────────────────────
+
+    private async Task RestoreLicenseAsync()
+    {
+        // Resolve the real (non-root) user's home directory.
+        // The installer runs as root via pkexec/sudo, so HOME may point to /root.
+        string? realUser = GetRealUserName();
+        if (realUser == null) return;
+
+        string userHome  = GetHomeForUser(realUser);
+        string tokenPath = Path.Combine(userHome, ".local", "share", "AegisDNS", "activation.token");
+
+        // Silent — nothing to restore on fresh installs without a prior activation.
+        if (!File.Exists(tokenPath)) return;
+
+        string token = await File.ReadAllTextAsync(tokenPath);
+
+        // Destination 1: /etc/aegisdns/license.key (ConfigDir created in step 0)
+        string etcKey = Path.Combine(ConfigDir, "license.key");
+        await File.WriteAllTextAsync(etcKey, token);
+        Chmod(etcKey, "600");
+
+        // Destination 2: /root/.config/aegisdns/license.key
+        string rootConfigDir = Path.Combine("/root", ".config", "aegisdns");
+        Directory.CreateDirectory(rootConfigDir);
+        Chmod(rootConfigDir, "700");
+        string rootKey = Path.Combine(rootConfigDir, "license.key");
+        await File.WriteAllTextAsync(rootKey, token);
+        Chmod(rootKey, "600");
+    }
+
+    // ── Step 7: Free port 53 ─────────────────────────────────────────────────
+
+    private const string ResolvedConf = "/etc/systemd/resolved.conf";
+
+    // Install: set DNSStubListener=no so systemd-resolved stops binding :53.
+    // Backs up the original file to BackupDir/resolved.conf.bak for uninstall.
+    private async Task DisableResolvedStubAsync()
+    {
+        if (File.Exists(ResolvedConf))
+            File.Copy(ResolvedConf, Path.Combine(BackupDir, "resolved.conf.bak"), overwrite: true);
+
+        string content = File.Exists(ResolvedConf)
+            ? await File.ReadAllTextAsync(ResolvedConf)
+            : "[Resolve]\n";
+
+        // Walk every line: replace existing DNSStubListener entries (even if
+        // commented out) with the authoritative no-stub line.
+        var lines = new List<string>(content.Split('\n'));
+        bool found = false;
+        for (int i = 0; i < lines.Count; i++)
+        {
+            string trimmed = lines[i].TrimStart('#', ' ', '\t');
+            if (trimmed.StartsWith("DNSStubListener", StringComparison.OrdinalIgnoreCase))
+            {
+                lines[i] = "DNSStubListener=no";
+                found = true;
+            }
+        }
+        if (!found)
+            lines.Add("DNSStubListener=no");
+
+        await File.WriteAllTextAsync(ResolvedConf, string.Join('\n', lines));
+        await RunAsyncWithArgumentList("systemctl", new[] { "restart", "systemd-resolved" });
+    }
+
+    // Uninstall: restore DNSStubListener=yes so the system stub resolver comes back.
+    // Called by uninstall logic; static so it can be invoked without an instance.
+    public static async Task RestoreResolvedStubAsync()
+    {
+        string backup = Path.Combine(BackupDir, "resolved.conf.bak");
+        if (File.Exists(backup))
+        {
+            File.Copy(backup, ResolvedConf, overwrite: true);
+        }
+        else if (File.Exists(ResolvedConf))
+        {
+            var lines = new List<string>((await File.ReadAllTextAsync(ResolvedConf)).Split('\n'));
+            for (int i = 0; i < lines.Count; i++)
+            {
+                if (string.Equals(lines[i].Trim(), "DNSStubListener=no",
+                                  StringComparison.OrdinalIgnoreCase))
+                    lines[i] = "DNSStubListener=yes";
+            }
+            await File.WriteAllTextAsync(ResolvedConf, string.Join('\n', lines));
+        }
+        await RunAsyncWithArgumentList("systemctl", new[] { "restart", "systemd-resolved" });
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the real (non-root) username when the installer was elevated via
+    /// pkexec or sudo. Returns null if we are genuinely running as root with no
+    /// underlying user, or if the env vars are absent.
+    /// </summary>
+    private static string? GetRealUserName()
+    {
+        // pkexec sets PKEXEC_UID to the invoking user's numeric UID
+        string? pkexecUid = Environment.GetEnvironmentVariable("PKEXEC_UID");
+        if (!string.IsNullOrEmpty(pkexecUid))
+            return GetUsernameForUid(pkexecUid);
+
+        // sudo sets SUDO_USER to the invoking username
+        string? sudoUser = Environment.GetEnvironmentVariable("SUDO_USER");
+        if (!string.IsNullOrEmpty(sudoUser))
+            return sudoUser;
+
+        return null;
+    }
+
+    /// <summary>
+    /// Looks up a username by numeric UID from /etc/passwd.
+    /// Returns null if not found or on parse error.
+    /// </summary>
+    private static string? GetUsernameForUid(string uid)
+    {
+        try
+        {
+            foreach (var line in File.ReadLines("/etc/passwd"))
+            {
+                var f = line.Split(':');
+                if (f.Length >= 3 && f[2] == uid)
+                    return f[0];
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the home directory for the given username from /etc/passwd.
+    /// Falls back to /home/{username} if the lookup fails.
+    /// </summary>
+    private static string GetHomeForUser(string username)
+    {
+        try
+        {
+            foreach (var line in File.ReadLines("/etc/passwd"))
+            {
+                var f = line.Split(':');
+                if (f.Length >= 6 && f[0] == username)
+                    return f[5]; // home dir is field index 5
+            }
+        }
+        catch { }
+        return Path.Combine("/home", username);
+    }
+
+    private static void Chmod(string path, string mode)
+    {
+        var psi = new ProcessStartInfo("chmod") { UseShellExecute = false };
+        psi.ArgumentList.Add(mode);
+        psi.ArgumentList.Add(path);
+        using var p = Process.Start(psi);
+        p?.WaitForExit();
+    }
+
+    private static void CopyDirectory(string src, string dst)
+    {
+        Directory.CreateDirectory(dst);
+        foreach (var file in Directory.GetFiles(src, "*", SearchOption.AllDirectories))
+        {
+            string rel = Path.GetRelativePath(src, file);
+            string target = Path.Combine(dst, rel);
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(file, target, overwrite: true);
+        }
+    }
+
+    private static async Task RunAsyncWithArgumentList(string cmd, string[] args,
+        bool ignoreErrors = false)
+    {
+        var psi = new ProcessStartInfo(cmd)
+        {
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+        };
+
+        foreach (var arg in args)
+            psi.ArgumentList.Add(arg);
+
+        using var p = Process.Start(psi);
+        if (p == null) return;
+        await p.WaitForExitAsync();
+        if (!ignoreErrors && p.ExitCode != 0)
+            throw new Exception($"{cmd} {string.Join(" ", args)} exited with code {p.ExitCode}");
+    }
+
+
+
+    private static async Task<(int ExitCode, string StdOut, string StdErr)>
+        RunCapture(string cmd, string[] args)
+    {
+        var psi = new ProcessStartInfo(cmd)
+        {
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        foreach (var arg in args)
+            psi.ArgumentList.Add(arg);
+        using var p = Process.Start(psi);
+        if (p == null) return (-1, "", "");
+        string stdout = await p.StandardOutput.ReadToEndAsync();
+        string stderr = await p.StandardError.ReadToEndAsync();
+        await p.WaitForExitAsync();
+        return (p.ExitCode, stdout, stderr);
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Installer/ViewModels/InstallerViewModel.cs">
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
+using System.Net.NetworkInformation;
+using System.Reactive;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
+
+using AegisDNS.Licensing;
+
+using ReactiveUI;
+
+namespace AegisDNS.Installer.ViewModels;
+
+public enum InstallerPage
+{
+    Welcome = 0,
+    LicenseAgreement = 1,
+    InstallType = 2,
+    SystemAudit = 3,
+    LicenseActivation = 4,
+    DnsConfig = 5,
+    AiConfig = 6,
+    InstallProgress = 7,
+    Complete = 8
+}
+
+public class AuditItem : ReactiveObject
+{
+    private string _name = "";
+    public string Name { get => _name; set => this.RaiseAndSetIfChanged(ref _name, value); }
+
+    private string _status = "⏳";
+    public string Status { get => _status; set => this.RaiseAndSetIfChanged(ref _status, value); }
+
+    private string _message = "";
+    public string Message { get => _message; set => this.RaiseAndSetIfChanged(ref _message, value); }
+
+    private string _statusColor = "Gray";
+    public string StatusColor { get => _statusColor; set => this.RaiseAndSetIfChanged(ref _statusColor, value); }
+}
+
+public class InstallStep : ReactiveObject
+{
+    private string _name = "";
+    public string Name { get => _name; set => this.RaiseAndSetIfChanged(ref _name, value); }
+
+    private string _icon = "⚪";
+    public string Icon { get => _icon; set => this.RaiseAndSetIfChanged(ref _icon, value); }
+
+    private string _status = "Waiting...";
+    public string Status { get => _status; set => this.RaiseAndSetIfChanged(ref _status, value); }
+
+    private string _elapsed = "0s";
+    public string Elapsed { get => _elapsed; set => this.RaiseAndSetIfChanged(ref _elapsed, value); }
+}
+
+// UI ViewModel: logger injection deferred — Installer ViewModels are not DI-constructed; Debug.WriteLine retained.
+public class InstallerViewModel : ReactiveObject
+{
+    // ── Page Navigation ───────────────────────────────────────────────────────
+
+    private InstallerPage _currentPage = InstallerPage.Welcome;
+    public InstallerPage CurrentPage
+    {
+        get => _currentPage;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _currentPage, value);
+            this.RaisePropertyChanged(nameof(CurrentPageIndex));
+            this.RaisePropertyChanged(nameof(CanGoBack));
+            this.RaisePropertyChanged(nameof(CanGoNext));
+        }
+    }
+
+    public int CurrentPageIndex => (int)CurrentPage;
+
+    public bool CanGoBack => CurrentPage != InstallerPage.Welcome
+                          && CurrentPage != InstallerPage.InstallProgress
+                          && CurrentPage != InstallerPage.Complete;
+
+    public bool CanGoNext => CurrentPage != InstallerPage.InstallProgress
+                          && CurrentPage != InstallerPage.Complete
+                          && (CurrentPage != InstallerPage.LicenseAgreement || LicenseAccepted)
+                          && CurrentPage != InstallerPage.Welcome; // Welcome uses card buttons
+
+    // ── Welcome Page ──────────────────────────────────────────────────────────
+
+    private string _detectedDistro = "Detecting...";
+    public string DetectedDistro { get => _detectedDistro; set => this.RaiseAndSetIfChanged(ref _detectedDistro, value); }
+
+    private string _kernelVersion = "Detecting...";
+    public string KernelVersion { get => _kernelVersion; set => this.RaiseAndSetIfChanged(ref _kernelVersion, value); }
+
+    private string _ramInfo = "Detecting...";
+    public string RamInfo { get => _ramInfo; set => this.RaiseAndSetIfChanged(ref _ramInfo, value); }
+
+    private string _cpuInfo = "Detecting...";
+    public string CpuInfo { get => _cpuInfo; set => this.RaiseAndSetIfChanged(ref _cpuInfo, value); }
+
+    private string _installerHash = "Computing...";
+    public string InstallerHash { get => _installerHash; set => this.RaiseAndSetIfChanged(ref _installerHash, value); }
+
+    // ── License Agreement Page ────────────────────────────────────────────────
+
+    private bool _licenseAccepted = false;
+    public bool LicenseAccepted
+    {
+        get => _licenseAccepted;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _licenseAccepted, value);
+            this.RaisePropertyChanged(nameof(CanGoNext));
+        }
+    }
+
+    // ── Install Type Page ─────────────────────────────────────────────────────
+
+    private bool _recommendedSelected = true;
+    public bool RecommendedSelected
+    {
+        get => _recommendedSelected;
+        set { this.RaiseAndSetIfChanged(ref _recommendedSelected, value); if (value) { CustomSelected = false; HeadlessSelected = false; } }
+    }
+
+    private bool _customSelected = false;
+    public bool CustomSelected
+    {
+        get => _customSelected;
+        set { this.RaiseAndSetIfChanged(ref _customSelected, value); if (value) { RecommendedSelected = false; HeadlessSelected = false; } }
+    }
+
+    private bool _headlessSelected = false;
+    public bool HeadlessSelected
+    {
+        get => _headlessSelected;
+        set { this.RaiseAndSetIfChanged(ref _headlessSelected, value); if (value) { RecommendedSelected = false; CustomSelected = false; } }
+    }
+
+    // ── System Audit Page ─────────────────────────────────────────────────────
+
+    public ObservableCollection<AuditItem> AuditItems { get; } = new();
+
+    private bool _auditPassed = false;
+    public bool AuditPassed { get => _auditPassed; set => this.RaiseAndSetIfChanged(ref _auditPassed, value); }
+
+    private bool _ebpfAvailable = false;
+    public bool EbpfAvailable { get => _ebpfAvailable; set => this.RaiseAndSetIfChanged(ref _ebpfAvailable, value); }
+
+    // ── License Activation Page ───────────────────────────────────────────────
+
+    public string MachineHwid { get; } = HardwareIdentity.Get();
+
+    private string _licenseKey = "";
+    public string LicenseKey
+    {
+        get => _licenseKey;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _licenseKey, value);
+            KeyFormatValid = LicenseManager.ValidateFormat(value);
+            this.RaisePropertyChanged(nameof(KeyFormatValid));
+        }
+    }
+
+    private string _activationStatus = "Enter your license key above.";
+    public string ActivationStatus { get => _activationStatus; set => this.RaiseAndSetIfChanged(ref _activationStatus, value); }
+
+    private string _activationColor = "#555555";
+    public string ActivationColor { get => _activationColor; set => this.RaiseAndSetIfChanged(ref _activationColor, value); }
+
+    public bool KeyFormatValid { get; private set; } = false;
+
+    private bool _licenseActivated = false;
+    public bool LicenseActivated { get => _licenseActivated; set => this.RaiseAndSetIfChanged(ref _licenseActivated, value); }
+
+    private string _activatedEdition = "Community";
+    public string ActivatedEdition { get => _activatedEdition; set => this.RaiseAndSetIfChanged(ref _activatedEdition, value); }
+
+    // ── DNS Config Page ───────────────────────────────────────────────────────
+
+    private string _cloudflareLatency = "Testing...";
+    public string CloudflareLatency { get => _cloudflareLatency; set => this.RaiseAndSetIfChanged(ref _cloudflareLatency, value); }
+
+    private string _googleLatency = "Testing...";
+    public string GoogleLatency { get => _googleLatency; set => this.RaiseAndSetIfChanged(ref _googleLatency, value); }
+
+    private string _quad9Latency = "Testing...";
+    public string Quad9Latency { get => _quad9Latency; set => this.RaiseAndSetIfChanged(ref _quad9Latency, value); }
+
+    private string _openDnsLatency = "Testing...";
+    public string OpenDnsLatency { get => _openDnsLatency; set => this.RaiseAndSetIfChanged(ref _openDnsLatency, value); }
+
+    private bool _dohEnabled = true;
+    public bool DohEnabled { get => _dohEnabled; set => this.RaiseAndSetIfChanged(ref _dohEnabled, value); }
+
+    private string _selectedUpstream = "Cloudflare";
+    public string SelectedUpstream
+    {
+        get => _selectedUpstream;
+        set { this.RaiseAndSetIfChanged(ref _selectedUpstream, value); this.RaisePropertyChanged(nameof(ShowCustomFields)); }
+    }
+
+    public bool ShowCustomFields => SelectedUpstream == "Custom";
+
+    private string _customPrimary = "";
+    public string CustomPrimary { get => _customPrimary; set => this.RaiseAndSetIfChanged(ref _customPrimary, value); }
+
+    private string _customSecondary = "";
+    public string CustomSecondary { get => _customSecondary; set => this.RaiseAndSetIfChanged(ref _customSecondary, value); }
+
+    // ── AI Config Page ────────────────────────────────────────────────────────
+
+    private string _aiProvider = "None";
+    public string AiProvider { get => _aiProvider; set => this.RaiseAndSetIfChanged(ref _aiProvider, value); }
+
+    private string _aiApiKey = "";
+    public string AiApiKey { get => _aiApiKey; set => this.RaiseAndSetIfChanged(ref _aiApiKey, value); }
+
+    private string _aiModel = "";
+    public string AiModel { get => _aiModel; set => this.RaiseAndSetIfChanged(ref _aiModel, value); }
+
+    private string _aiTestResult = "";
+    public string AiTestResult { get => _aiTestResult; set => this.RaiseAndSetIfChanged(ref _aiTestResult, value); }
+
+    // ── Install Progress Page ─────────────────────────────────────────────────
+
+    private double _installProgress = 0;
+    public double InstallProgress { get => _installProgress; set => this.RaiseAndSetIfChanged(ref _installProgress, value); }
+
+    private string _timeRemaining = "Ready to install";
+    public string TimeRemaining { get => _timeRemaining; set => this.RaiseAndSetIfChanged(ref _timeRemaining, value); }
+
+    public ObservableCollection<InstallStep> InstallSteps { get; } = new();
+
+    private bool _installComplete = false;
+    public bool InstallComplete
+    {
+        get => _installComplete;
+        set { this.RaiseAndSetIfChanged(ref _installComplete, value); this.RaisePropertyChanged(nameof(CanGoNext)); }
+    }
+
+    private bool _installFailed = false;
+    public bool InstallFailed { get => _installFailed; set => this.RaiseAndSetIfChanged(ref _installFailed, value); }
+
+    // ── Complete Page ─────────────────────────────────────────────────────────
+
+    private string _summaryEdition = "Community";
+    public string SummaryEdition { get => _summaryEdition; set => this.RaiseAndSetIfChanged(ref _summaryEdition, value); }
+
+    private string _summaryDns = "Cloudflare";
+    public string SummaryDns { get => _summaryDns; set => this.RaiseAndSetIfChanged(ref _summaryDns, value); }
+
+    private string _summaryAi = "Disabled";
+    public string SummaryAi { get => _summaryAi; set => this.RaiseAndSetIfChanged(ref _summaryAi, value); }
+
+    private string _summaryEbpf = "Pending";
+    public string SummaryEbpf { get => _summaryEbpf; set => this.RaiseAndSetIfChanged(ref _summaryEbpf, value); }
+
+    private bool _autoStartEnabled = true;
+    public bool AutoStartEnabled { get => _autoStartEnabled; set => this.RaiseAndSetIfChanged(ref _autoStartEnabled, value); }
+
+    // ── Commands ──────────────────────────────────────────────────────────────
+
+    public ReactiveCommand<Unit, Unit> BackCommand { get; }
+    public ReactiveCommand<Unit, Unit> NextCommand { get; }
+    public ReactiveCommand<Unit, Unit> ExpressCommand { get; }
+    public ReactiveCommand<Unit, Unit> AdvancedCommand { get; }
+    public ReactiveCommand<Unit, Unit> HeadlessCommand { get; }
+    public ReactiveCommand<Unit, Unit> ActivateCommand { get; }
+    public ReactiveCommand<Unit, Unit> SkipLicenseCommand { get; }
+    public ReactiveCommand<Unit, Unit> TestLatencyCommand { get; }
+    public ReactiveCommand<Unit, Unit> TestAiCommand { get; }
+    public ReactiveCommand<Unit, Unit> StartInstallCommand { get; }
+    public ReactiveCommand<Unit, Unit> LaunchCommand { get; }
+
+    // ── Constructor ───────────────────────────────────────────────────────────
+
+    public InstallerViewModel()
+    {
+        BackCommand = ReactiveCommand.Create(GoBack);
+        NextCommand = ReactiveCommand.Create(GoNext);
+        ExpressCommand = ReactiveCommand.Create(() =>
+        {
+            RecommendedSelected = true;
+            CurrentPage = InstallerPage.SystemAudit;
+            RunAuditAsync();
+        });
+        AdvancedCommand = ReactiveCommand.Create(() =>
+        {
+            CustomSelected = true;
+            CurrentPage = InstallerPage.SystemAudit;
+            RunAuditAsync();
+        });
+        HeadlessCommand = ReactiveCommand.Create(() =>
+        {
+            HeadlessSelected = true;
+            CurrentPage = InstallerPage.SystemAudit;
+            RunAuditAsync();
+        });
+        ActivateCommand = ReactiveCommand.CreateFromTask(ActivateAsync);
+        SkipLicenseCommand = ReactiveCommand.Create(() =>
+        {
+            LicenseActivated = true;
+            ActivatedEdition = "Community";
+            GoNext();
+        });
+        TestLatencyCommand = ReactiveCommand.CreateFromTask(TestLatencyAsync);
+        TestAiCommand = ReactiveCommand.CreateFromTask(TestAiAsync);
+        StartInstallCommand = ReactiveCommand.CreateFromTask(StartInstallAsync);
+        LaunchCommand = ReactiveCommand.Create(() =>
+        {
+            try
+            {
+                var psi = new ProcessStartInfo("/opt/AegisDNS/AegisDNSUI");
+                psi.UseShellExecute = false;
+                Process.Start(psi);
+            }
+            catch { /* will run from app launcher */ }
+            Environment.Exit(0);
+        });
+
+        DetectSystemInfo();
+        BuildInstallSteps();
+
+        // Check if already activated (e.g. on reinstall)
+        using (LicenseTokenScope.ForRealUserIfElevated())
+        {
+            if (LicenseManager.IsLicenseValid())
+            {
+                // Force a rewrite of the token to ensure the timestamp is updated
+                // and it is bound to the current machine's HWID (safety measure).
+                string? raw = LicenseManager.GetRawLicenseFromToken();
+                if (raw != null)
+                {
+                    LicenseManager.EnsureActivated(raw);
+                }
+
+                LicenseActivated = true;
+                ActivatedEdition = LicenseManager.CurrentTier.ToString();
+                ActivationStatus = $"✅ Activated — {ActivatedEdition} Edition";
+                ActivationColor = "#00FF88";
+                SummaryEdition = ActivatedEdition;
+            }
+        }
+    }
+
+    // ── Navigation ────────────────────────────────────────────────────────────
+
+    private void GoBack()
+    {
+        if (CurrentPage == InstallerPage.SystemAudit)
+        {
+            // Back from audit goes to InstallType, not previous enum value
+            CurrentPage = InstallerPage.InstallType;
+            return;
+        }
+        if ((int)CurrentPage > 0)
+            CurrentPage = (InstallerPage)((int)CurrentPage - 1);
+    }
+
+    private void GoNext()
+    {
+        // Express mode skips DnsConfig + AiConfig
+        if (RecommendedSelected && CurrentPage == InstallerPage.LicenseActivation)
+        {
+            CurrentPage = InstallerPage.InstallProgress;
+            return;
+        }
+        if ((int)CurrentPage < (int)InstallerPage.Complete)
+            CurrentPage = (InstallerPage)((int)CurrentPage + 1);
+    }
+
+    // ── System Detection ──────────────────────────────────────────────────────
+
+    private void DetectSystemInfo()
+    {
+        Task.Run(() =>
+        {
+            try
+            {
+                // Distro
+                if (File.Exists("/etc/os-release"))
+                {
+                    foreach (var line in File.ReadAllLines("/etc/os-release"))
+                        if (line.StartsWith("PRETTY_NAME="))
+                        { DetectedDistro = line.Split('=')[1].Trim('"'); break; }
+                }
+
+                // Kernel
+                KernelVersion = RunCmd("uname", "-r").Trim();
+
+                // RAM
+                if (File.Exists("/proc/meminfo"))
+                {
+                    foreach (var line in File.ReadAllLines("/proc/meminfo"))
+                        if (line.StartsWith("MemTotal:"))
+                        {
+                            var kb = long.Parse(line.Split(new[] { ' ' },
+                                StringSplitOptions.RemoveEmptyEntries)[1]);
+                            RamInfo = $"{kb / 1024 / 1024} GB";
+                            break;
+                        }
+                }
+
+                // CPU
+                if (File.Exists("/proc/cpuinfo"))
+                {
+                    foreach (var line in File.ReadAllLines("/proc/cpuinfo"))
+                        if (line.StartsWith("model name"))
+                        {
+                            CpuInfo = line.Split(':')[1].Trim();
+                            break;
+                        }
+                }
+
+                // Installer hash (self)
+                var self = Environment.ProcessPath ?? "";
+                if (File.Exists(self))
+                {
+                    using var sha = System.Security.Cryptography.SHA256.Create();
+                    using var stream = File.OpenRead(self);
+                    var hash = Convert.ToHexString(sha.ComputeHash(stream));
+                    InstallerHash = $"SHA256: {hash[..8]}...{hash[^8..]}";
+                }
+                else InstallerHash = "SHA256: N/A";
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[InstallerViewModel] DetectSystemInfo: {ex.Message}");
+            }
+        });
+    }
+
+    // ── Audit ─────────────────────────────────────────────────────────────────
+
+    private async void RunAuditAsync()
+    {
+        AuditItems.Clear();
+        AuditPassed = false;
+        EbpfAvailable = false;
+
+        var checks = new (string Name, Func<(bool Ok, bool Critical, string Msg)> Check)[]
+        {
+            ("Root Privileges", () => {
+                bool ok = Environment.IsPrivilegedProcess
+                          || RunCmd("id", "-u").Trim() == "0"
+                          || Environment.GetEnvironmentVariable("EUID") == "0"
+                          || Environment.GetEnvironmentVariable("USER") == "root";
+                return (ok, true, ok ? "Running with elevated permissions" : "Not running as root — pkexec required"); }),
+            (".NET 10 Runtime",     () => {
+                var v = RunCmd("dotnet", "--list-runtimes");
+                bool ok = v.Contains("Microsoft.NETCore.App 10.");
+                return (ok, true, ok ? ".NET 10 runtime confirmed" : ".NET 10 not found — installer will offer to install"); }),
+            ("systemd",             () => {
+                bool ok = RunCmd("systemctl", "--version").Contains("systemd");
+                return (ok, true, ok ? "systemd is present" : "systemd not found — required for service management"); }),
+            ("Kernel 5.8+",         () => {
+                var k = RunCmd("uname", "-r").Trim();
+                var parts = k.Split('.');
+                bool ok = parts.Length >= 2
+                       && int.TryParse(parts[0], out int maj)
+                       && int.TryParse(parts[1].Split('-')[0], out int min)
+                       && (maj > 5 || (maj == 5 && min >= 8));
+                return (ok, false, ok ? $"Kernel {k} — eBPF supported" : $"Kernel {k} — below 5.8, eBPF unavailable"); }),
+            ("Kernel BTF (vmlinux)", () => {
+                bool ok = File.Exists("/sys/kernel/btf/vmlinux");
+                return (ok, false, ok ? "BTF data available" : "BTF not found — eBPF compilation will be skipped"); }),
+            ("cgroup v2",           () => {
+                var mounts = File.Exists("/proc/mounts") ? File.ReadAllText("/proc/mounts") : "";
+                bool ok = mounts.Contains("cgroup2");
+                return (ok, false, ok ? "cgroup v2 mounted" : "cgroup v2 not detected"); }),
+            ("clang",               () => {
+                bool ok = CommandExists("clang");
+                return (ok, false, ok ? "clang compiler found" : "clang not found — eBPF compilation unavailable"); }),
+            ("Disk Space (200MB+)", () => {
+                try {
+                    var info = new DriveInfo("/");
+                    bool ok = info.AvailableFreeSpace > 200L * 1024 * 1024;
+                    return (ok, true, ok ? $"{info.AvailableFreeSpace / 1024 / 1024} MB free" : "Less than 200 MB free"); }
+                catch { return (true, false, "Could not check disk space"); } }),
+        };
+
+        bool allCriticalPassed = true;
+        bool ebpfChecks = true;
+
+        foreach (var (name, check) in checks)
+        {
+            var item = new AuditItem { Name = name, Status = "⏳", Message = "Checking...", StatusColor = "#555555" };
+            AuditItems.Add(item);
+
+            await Task.Delay(120); // brief visual stagger
+            var (ok, critical, msg) = check();
+
+            item.Status = ok ? "✅" : (critical ? "❌" : "⚠️");
+            item.Message = msg;
+            item.StatusColor = ok ? "#00FF88" : (critical ? "#FF453A" : "#FFBD2E");
+
+            if (critical && !ok) allCriticalPassed = false;
+            if (!ok && (name.Contains("BTF") || name.Contains("clang") || name.Contains("cgroup") || name.Contains("Kernel 5")))
+                ebpfChecks = false;
+        }
+
+        AuditPassed = allCriticalPassed;
+        EbpfAvailable = ebpfChecks && allCriticalPassed;
+        SummaryEbpf = EbpfAvailable ? "Active (eBPF)" : "Fallback (iptables)";
+    }
+
+    // ── License Activation ────────────────────────────────────────────────────
+
+    private async Task ActivateAsync()
+    {
+        ActivationStatus = "Activating...";
+        ActivationColor = "#FFBD2E";
+
+        await Task.Run(() =>
+        {
+            bool ok = LicenseManager.EnsureActivated(LicenseKey);
+            if (ok)
+            {
+                LicenseActivated = true;
+                ActivatedEdition = LicenseManager.CurrentTier.ToString();
+                ActivationStatus = $"✅ Activated — {ActivatedEdition} Edition";
+                ActivationColor = "#00FF88";
+                SummaryEdition = ActivatedEdition;
+
+                // When running elevated the token was written to the root-owned
+                // AppData path. Copy it to the real user's directory so the
+                // service can read it after the installer exits.
+                CopyTokenToRealUser();
+            }
+            else
+            {
+                ActivationStatus = "❌ Invalid key — check format and try again";
+                ActivationColor = "#FF453A";
+            }
+        });
+    }
+
+    /// <summary>
+    /// If the process is elevated (pkexec / sudo), copies the activation token
+    /// from the root-owned path to the real user's home directory and chowns it.
+    /// No-ops when not elevated or when the token file does not exist.
+    /// </summary>
+    private static void CopyTokenToRealUser()
+    {
+        try
+        {
+            // Resolve elevated user context once and no-op if not elevated.
+            if (!TryGetRealUserContext(out string? realUser, out string? realHome)
+                || string.IsNullOrWhiteSpace(realUser)
+                || string.IsNullOrWhiteSpace(realHome))
+                return;
+
+            string resolvedUser = realUser;
+            string resolvedHome = realHome;
+
+            // ── 2. Locate the source token via AesGcmTokenStore ───────────────
+            // GetTokenPath resolves to the path AesGcmTokenStore just wrote;
+            // when running as root this is under /root/.local/share/AegisDNS/.
+            string sourceToken = AesGcmTokenStore.GetTokenPath("AegisDNS");
+            if (!File.Exists(sourceToken))
+                return;
+
+            // ── 3. Copy to the real user's path ──────────────────────────────
+            string destDir = Path.Combine(resolvedHome, ".local", "share", "AegisDNS");
+            Directory.CreateDirectory(destDir);
+
+            string destToken = Path.Combine(destDir, "activation.token");
+            if (sourceToken != destToken)
+            {
+                File.Copy(sourceToken, destToken, overwrite: true);
+            }
+
+            // ── 4. chown to real user (ArgumentList — never bash -c) ──────────
+            var psi = new ProcessStartInfo("chown")
+            {
+                UseShellExecute = false,
+                RedirectStandardOutput = false,
+                RedirectStandardError = false
+            };
+            psi.ArgumentList.Add($"{resolvedUser}:{resolvedUser}");
+            psi.ArgumentList.Add(destToken);
+
+            using var p = Process.Start(psi);
+            p?.WaitForExit();
+
+            Debug.WriteLine($"[InstallerViewModel] Token copied to {destToken} and chowned to {resolvedUser}");
+        }
+        catch (Exception ex)
+        {
+            // Non-fatal — the user can re-activate from the UI if needed.
+            Debug.WriteLine($"[InstallerViewModel] CopyTokenToRealUser failed: {ex.Message}");
+        }
+    }
+
+    private static bool TryGetRealUserContext(out string? username, out string? homeDir)
+    {
+        username = null;
+        homeDir = null;
+
+        string? sudoUser = Environment.GetEnvironmentVariable("SUDO_USER");
+        if (!string.IsNullOrEmpty(sudoUser) && sudoUser != "root")
+        {
+            username = sudoUser;
+            homeDir = Path.Combine("/home", sudoUser);
+        }
+
+        if (homeDir == null)
+        {
+            string? pkexecUid = Environment.GetEnvironmentVariable("PKEXEC_UID");
+            if (!string.IsNullOrEmpty(pkexecUid) && int.TryParse(pkexecUid, out int uid) && uid != 0 && File.Exists("/etc/passwd"))
+            {
+                foreach (var line in File.ReadAllLines("/etc/passwd"))
+                {
+                    var parts = line.Split(':');
+                    if (parts.Length >= 7
+                        && int.TryParse(parts[2], out int lineUid)
+                        && lineUid == uid)
+                    {
+                        username = parts[0];
+                        homeDir = parts[5];
+                        break;
+                    }
+                }
+            }
+        }
+
+        return !string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(homeDir);
+    }
+
+    private readonly struct LicenseTokenScope : IDisposable
+    {
+        private readonly string? _previousXdgDataHome;
+        private readonly bool _changed;
+
+        private LicenseTokenScope(string? previousXdgDataHome, bool changed)
+        {
+            _previousXdgDataHome = previousXdgDataHome;
+            _changed = changed;
+        }
+
+        public static LicenseTokenScope ForRealUserIfElevated()
+        {
+            if (!TryGetRealUserContext(out _, out string? realHome) || string.IsNullOrWhiteSpace(realHome))
+                return new LicenseTokenScope(previousXdgDataHome: null, changed: false);
+
+            string targetXdgDataHome = Path.Combine(realHome, ".local", "share");
+            string? previous = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
+
+            if (string.Equals(previous, targetXdgDataHome, StringComparison.Ordinal))
+                return new LicenseTokenScope(previousXdgDataHome: previous, changed: false);
+
+            Environment.SetEnvironmentVariable("XDG_DATA_HOME", targetXdgDataHome);
+            return new LicenseTokenScope(previousXdgDataHome: previous, changed: true);
+        }
+
+        public void Dispose()
+        {
+            if (_changed)
+                Environment.SetEnvironmentVariable("XDG_DATA_HOME", _previousXdgDataHome);
+        }
+    }
+
+    // ── DNS Latency Test ──────────────────────────────────────────────────────
+
+    private async Task TestLatencyAsync()
+    {
+        CloudflareLatency = "Testing...";
+        GoogleLatency = "Testing...";
+        Quad9Latency = "Testing...";
+        OpenDnsLatency = "Testing...";
+
+        var tests = new (string Prop, string Host)[]
+        {
+            ("Cloudflare", "1.1.1.1"),
+            ("Google",     "8.8.8.8"),
+            ("Quad9",      "9.9.9.9"),
+            ("OpenDns",    "208.67.222.222"),
+        };
+
+        foreach (var (prop, host) in tests)
+        {
+            var ms = await PingAsync(host);
+            var label = ms < 0 ? "Timeout" : $"{ms}ms";
+            switch (prop)
+            {
+                case "Cloudflare": CloudflareLatency = label; break;
+                case "Google": GoogleLatency = label; break;
+                case "Quad9": Quad9Latency = label; break;
+                case "OpenDns": OpenDnsLatency = label; break;
+            }
+        }
+    }
+
+    private static async Task<long> PingAsync(string host)
+    {
+        try
+        {
+            using var ping = new Ping();
+            var reply = await ping.SendPingAsync(host, 2000);
+            return reply.Status == IPStatus.Success ? reply.RoundtripTime : -1;
+        }
+        catch { return -1; }
+    }
+
+    // ── AI Test ───────────────────────────────────────────────────────────────
+
+    private async Task TestAiAsync()
+    {
+        AiTestResult = "Testing connection...";
+        await Task.Delay(1000);
+        AiTestResult = AiProvider switch
+        {
+            "None" => "",
+            "Ollama (Local)" => CommandExists("ollama") ? "✅ Ollama running locally" : "⚠️ Ollama not found — install from ollama.ai",
+            _ => string.IsNullOrWhiteSpace(AiApiKey) ? "⚠️ API key required" : "✅ Key format OK — verified on first use"
+        };
+    }
+
+    // ── Install ───────────────────────────────────────────────────────────────
+
+    private void BuildInstallSteps()
+    {
+        InstallSteps.Clear();
+        InstallSteps.Add(new InstallStep { Name = "Create directories", Icon = "📁" });
+        InstallSteps.Add(new InstallStep { Name = "Copy binaries", Icon = "📦" });
+        InstallSteps.Add(new InstallStep { Name = "Compile eBPF protection", Icon = "🔥" });
+        InstallSteps.Add(new InstallStep { Name = "Install systemd service", Icon = "⚙️" });
+        InstallSteps.Add(new InstallStep { Name = "Configure DNS upstream", Icon = "🌐" });
+        InstallSteps.Add(new InstallStep { Name = "Write AI config", Icon = "🤖" });
+        InstallSteps.Add(new InstallStep { Name = "Desktop integration", Icon = "🖥️" });
+        InstallSteps.Add(new InstallStep { Name = "Free port 53", Icon = "🔓" });
+        InstallSteps.Add(new InstallStep { Name = "Start service", Icon = "🚀" });
+    }
+
+    private async Task StartInstallAsync()
+    {
+        InstallProgress = 0;
+        InstallFailed = false;
+        InstallComplete = false;
+        TimeRemaining = "Estimating...";
+
+        try
+        {
+            var svc = new Services.InstallService(this);
+            await svc.RunAsync();
+            InstallComplete = true;
+            CurrentPage = InstallerPage.Complete;
+            SummaryDns = DohEnabled ? $"{SelectedUpstream} (DoH)" : SelectedUpstream;
+            SummaryAi = AiProvider == "None" ? "Disabled" : AiProvider;
+        }
+        catch (Exception ex)
+        {
+            InstallFailed = true;
+            System.Diagnostics.Debug.WriteLine($"[Installer] Install failed: {ex}");
+        }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    internal void ReportStep(int stepIndex, string status, string elapsed)
+    {
+        if (stepIndex < InstallSteps.Count)
+        {
+            InstallSteps[stepIndex].Icon = "✅";
+            InstallSteps[stepIndex].Status = status;
+            InstallSteps[stepIndex].Elapsed = elapsed;
+        }
+        InstallProgress = (double)(stepIndex + 1) / InstallSteps.Count * 100.0;
+        int remaining = InstallSteps.Count - stepIndex - 1;
+        TimeRemaining = remaining > 0 ? $"~{remaining * 5}s remaining" : "Finishing...";
+    }
+
+    internal void FailStep(int stepIndex, string error)
+    {
+        if (stepIndex < InstallSteps.Count)
+        {
+            InstallSteps[stepIndex].Icon = "❌";
+            InstallSteps[stepIndex].Status = error;
+        }
+    }
+
+    private static string RunCmd(string cmd, string args)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo(cmd)
+            {
+                RedirectStandardOutput = true,
+                UseShellExecute = false
+            };
+            if (!string.IsNullOrWhiteSpace(args))
+            {
+                foreach (var arg in args.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    psi.ArgumentList.Add(arg);
+                }
+            }
+            using var p = Process.Start(psi);
+            return p?.StandardOutput.ReadToEnd() ?? "";
+        }
+        catch { return ""; }
+    }
+
+    private static bool CommandExists(string cmd)
+        => !string.IsNullOrEmpty(RunCmd("which", cmd));
+}
+</file>
+
+</files>

@@ -1,0 +1,708 @@
+This file is a merged representation of a subset of the codebase, containing specifically included files, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Only files matching these patterns are included: **/*.csproj, AegisDNS.sln
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+src/
+  AegisDNS.ArchitectureAnalyzer/
+    AegisDNS.ArchitectureAnalyzer.csproj
+  AegisDNS.Backend/
+    AegisDNS.Backend.csproj
+  AegisDNS.BpfLoader/
+    AegisDNS.BpfLoader.csproj
+  AegisDNS.BuildTools/
+    AegisDNS.BuildTools.csproj
+  AegisDNS.Core/
+    AegisDNS.Core.csproj
+  AegisDNS.Installer/
+    AegisDNS.Installer.csproj
+  AegisDNS.Licensing/
+    AegisDNS.Licensing.csproj
+  AegisDNS.Portal/
+    AegisDNS.Portal.csproj
+  AegisDNS.Service/
+    AegisDNS.Service.csproj
+  AegisDNS.UI/
+    AegisDNSUI.csproj
+  AegisDNS.UI.Linux/
+    AegisDNS.UI.Linux.csproj
+  AegisDNS.WebDashboard/
+    AegisDNS.WebDashboard.csproj
+  AegisDNS.XdpLoader/
+    AegisDNS.XdpLoader.csproj
+  AegisSummaries/
+    AegisSummaries.csproj
+tests/
+  AegisDNS.Licensing.Tests/
+    AegisDNS.Licensing.Tests.csproj
+AegisDNS.sln
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="src/AegisDNS.ArchitectureAnalyzer/AegisDNS.ArchitectureAnalyzer.csproj">
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>netstandard2.0</TargetFramework>
+		<LangVersion>latest</LangVersion>
+		<Nullable>enable</Nullable>
+		<IncludeBuildOutput>false</IncludeBuildOutput>
+		<IsRoslynAnalyzer>true</IsRoslynAnalyzer>
+	    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+  </ItemGroup>
+
+</Project>
+</file>
+
+<file path="src/AegisDNS.BpfLoader/AegisDNS.BpfLoader.csproj">
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
+    <Platforms>x64;arm64</Platforms>
+    <!-- Linux only — this project does not compile on Windows -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AegisDNS.Core\AegisDNS.Core.csproj" />
+  </ItemGroup>
+</Project>
+</file>
+
+<file path="src/AegisDNS.BuildTools/AegisDNS.BuildTools.csproj">
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>
+</file>
+
+<file path="src/AegisDNS.UI.Linux/AegisDNS.UI.Linux.csproj">
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.12" />
+    <PackageReference Include="Avalonia.Controls.ColorPicker" Version="11.3.12" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.12" />
+    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.12" />
+    <PackageReference Include="Avalonia.ReactiveUI" Version="11.3.8" />
+    <PackageReference Include="Avalonia.Skia" Version="11.3.12" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AegisDNS.ArchitectureAnalyzer\AegisDNS.ArchitectureAnalyzer.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>
+</file>
+
+<file path="src/AegisDNS.WebDashboard/AegisDNS.WebDashboard.csproj">
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AegisDNS.WebDashboard</RootNamespace>
+    <AssemblyName>AegisDNS.WebDashboard</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AegisDNS.Core\AegisDNS.Core.csproj" />
+    <ProjectReference Include="..\AegisDNS.Licensing\AegisDNS.Licensing.csproj" />
+  </ItemGroup>
+
+</Project>
+</file>
+
+<file path="src/AegisDNS.XdpLoader/AegisDNS.XdpLoader.csproj">
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Platforms>x64;arm64</Platforms>
+    <!-- Linux only — this project does not compile on Windows -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AegisDNS.Core\AegisDNS.Core.csproj" />
+  </ItemGroup>
+</Project>
+</file>
+
+<file path="src/AegisDNS.Backend/AegisDNS.Backend.csproj">
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.*-*" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.*" />
+    <PackageReference Include="StackExchange.Redis" Version="2.*" />
+    <PackageReference Include="Stripe.net" Version="45.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.*">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+</Project>
+</file>
+
+<file path="src/AegisDNS.Installer/AegisDNS.Installer.csproj">
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <BuiltInPrimaryFont>Inter</BuiltInPrimaryFont>
+    <RootNamespace>AegisDNS.Installer</RootNamespace>
+    <AssemblyName>AegisDNS.Installer</AssemblyName>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.12" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.12" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.12" />
+    <PackageReference Include="Avalonia.ReactiveUI" Version="11.3.8" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AegisDNS.Core\AegisDNS.Core.csproj" />
+    <ProjectReference Include="..\AegisDNS.Licensing\AegisDNS.Licensing.csproj" />
+  </ItemGroup>
+</Project>
+</file>
+
+<file path="src/AegisDNS.Portal/AegisDNS.Portal.csproj">
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.AspNetCore.Builder" />
+    <Using Include="Microsoft.AspNetCore.Hosting" />
+    <Using Include="Microsoft.AspNetCore.Http" />
+    <Using Include="Microsoft.Extensions.DependencyInjection" />
+    <Using Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+
+</Project>
+</file>
+
+<file path="src/AegisSummaries/AegisSummaries.csproj">
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>AegisSummaries</AssemblyName>
+    <RootNamespace>AegisSummaries</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.12" />
+    <PackageReference Include="Avalonia.Controls.ColorPicker" Version="11.3.12" />
+    <PackageReference Include="Avalonia.ReactiveUI" Version="11.3.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AegisDNS.Core\AegisDNS.Core.csproj" />
+    <ProjectReference Include="..\AegisDNS.UI.Linux\AegisDNS.UI.Linux.csproj" />
+  </ItemGroup>
+
+</Project>
+</file>
+
+<file path="src/AegisDNS.Service/AegisDNS.Service.csproj">
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+	  <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="10.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AegisDNS.Core\AegisDNS.Core.csproj" />
+    <ProjectReference Include="..\AegisDNS.ArchitectureAnalyzer\AegisDNS.ArchitectureAnalyzer.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\AegisDNS.Licensing\AegisDNS.Licensing.csproj" />
+    <ProjectReference Include="..\AegisDNS.BpfLoader\AegisDNS.BpfLoader.csproj" />
+    <ProjectReference Include="..\AegisDNS.XdpLoader\AegisDNS.XdpLoader.csproj" />
+    <ProjectReference Include="..\AegisDNS.WebDashboard\AegisDNS.WebDashboard.csproj" />
+  </ItemGroup>
+
+
+
+  <Target Name="CopyBpfObject" AfterTargets="Publish" Condition="'$(OS)' == 'Unix'">
+    <Message Text="[AegisDNS] Copying eBPF kernel object to publish output..." Importance="high" />
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)../../kernel/aegisdns.bpf.o"
+          DestinationFolder="$(PublishDir)kernel/"
+          Condition="Exists('$(MSBuildThisFileDirectory)../../kernel/aegisdns.bpf.o')" />
+  </Target>
+
+  <Target Name="CopyXdpObject" AfterTargets="Publish" Condition="'$(OS)' == 'Unix'">
+    <Message Text="[AegisDNS] Copying XDP kernel object to publish output..." Importance="high" />
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)../AegisDNS.XdpLoader/xdp/aegis_xdp.o"
+          DestinationFolder="$(PublishDir)xdp/"
+          Condition="Exists('$(MSBuildThisFileDirectory)../AegisDNS.XdpLoader/xdp/aegis_xdp.o')" />
+  </Target>
+</Project>
+</file>
+
+<file path="src/AegisDNS.Licensing/AegisDNS.Licensing.csproj">
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AegisDNS.Licensing.Tests" />
+  </ItemGroup>
+
+
+</Project>
+</file>
+
+<file path="src/AegisDNS.UI/AegisDNSUI.csproj">
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net10.0</TargetFramework>
+		<RootNamespace>AegisDNS</RootNamespace>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<PublishAot>false</PublishAot>
+		<InvariantGlobalization>true</InvariantGlobalization>
+
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+		<DefineConstants>$(DefineConstants);LINUX</DefineConstants>
+	</PropertyGroup>
+
+	
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.12" />
+    <PackageReference Include="Avalonia.Controls.ColorPicker" Version="11.3.12" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.12" />
+    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.12" />
+    <PackageReference Include="Avalonia.ReactiveUI" Version="11.3.8" />
+    <PackageReference Include="Avalonia.Skia" Version="11.3.12" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.12" />
+
+  </ItemGroup>
+
+	
+
+  <ItemGroup>
+    <ProjectReference Include="..\AegisDNS.Core\AegisDNS.Core.csproj" />
+    <ProjectReference Include="..\AegisDNS.Licensing\AegisDNS.Licensing.csproj" />
+    <ProjectReference Include="..\AegisDNS.UI.Linux\AegisDNS.UI.Linux.csproj" />
+    <ProjectReference Include="..\AegisSummaries\AegisSummaries.csproj" />
+  </ItemGroup>
+
+	
+
+  <ItemGroup>
+    <Compile Update="Properties\Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+	
+
+  <ItemGroup>
+    <EmbeddedResource Update="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+	  <ProjectReference Include="..\AegisDNS.ArchitectureAnalyzer\AegisDNS.ArchitectureAnalyzer.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+  <!-- Removed local signing task to enforce CI/CD offline signing constraint -->
+
+</Project>
+</file>
+
+<file path="src/AegisDNS.Core/AegisDNS.Core.csproj">
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+	  <OutputType>Library</OutputType>
+	  <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+    <DefineConstants>$(DefineConstants);LINUX</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ARSoft.Tools.Net" Version="3.6.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+	  <ProjectReference Include="..\AegisDNS.ArchitectureAnalyzer\AegisDNS.ArchitectureAnalyzer.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Security\*_public.pem">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Security\*.sig">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Security\*.manifest">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AegisDNS.Licensing\AegisDNS.Licensing.csproj" />
+  </ItemGroup>
+
+</Project>
+</file>
+
+<file path="AegisDNS.sln">
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.2.11430.68
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AegisDNSUI", "src\AegisDNS.UI\AegisDNSUI.csproj", "{12D6C8E0-CA1B-41B4-8FB0-4DD7C59DECD4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AegisDNS.Core", "src\AegisDNS.Core\AegisDNS.Core.csproj", "{68BB3934-579C-46E0-94EA-3722C562F18E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AegisDNS.Service", "src\AegisDNS.Service\AegisDNS.Service.csproj", "{7F062EAF-3E5B-4C9B-9A1A-BA36D120B3DE}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AegisDNS.BuildTools", "src\AegisDNS.BuildTools\AegisDNS.BuildTools.csproj", "{7F8C6504-A5DC-4E9A-927C-0CA1FDC495B4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AegisDNS.Licensing", "src\AegisDNS.Licensing\AegisDNS.Licensing.csproj", "{12E35E70-A7EA-449E-9F4C-A318D888F634}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AegisDNS.UI.Linux", "src\AegisDNS.UI.Linux\AegisDNS.UI.Linux.csproj", "{B975B1A0-581B-44E2-A83D-562AB88ED770}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AegisDNS.ArchitectureAnalyzer", "src\AegisDNS.ArchitectureAnalyzer\AegisDNS.ArchitectureAnalyzer.csproj", "{32CD399C-5090-4D48-ADE4-7AA66B00A400}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AegisSummaries", "src\AegisSummaries\AegisSummaries.csproj", "{8210EEF9-6625-41DF-B372-F54A14F42746}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AegisDNS.XdpLoader", "src\AegisDNS.XdpLoader\AegisDNS.XdpLoader.csproj", "{65CD3AC8-DFDB-4785-9A18-FD9C93AD1575}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AegisDNS.Installer", "src\AegisDNS.Installer\AegisDNS.Installer.csproj", "{FF0ADA8A-8E51-4EDD-9116-2D76A0C1C34F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AegisDNS.WebDashboard", "src\AegisDNS.WebDashboard\AegisDNS.WebDashboard.csproj", "{A1E17B2E-BE8C-4336-8779-429EB3E6CDEE}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AegisDNS.Licensing.Tests", "tests\AegisDNS.Licensing.Tests\AegisDNS.Licensing.Tests.csproj", "{E2BE7BC2-55A4-4402-9428-D86AE38A410F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{12D6C8E0-CA1B-41B4-8FB0-4DD7C59DECD4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{12D6C8E0-CA1B-41B4-8FB0-4DD7C59DECD4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{12D6C8E0-CA1B-41B4-8FB0-4DD7C59DECD4}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{12D6C8E0-CA1B-41B4-8FB0-4DD7C59DECD4}.Debug|x64.Build.0 = Debug|Any CPU
+		{12D6C8E0-CA1B-41B4-8FB0-4DD7C59DECD4}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{12D6C8E0-CA1B-41B4-8FB0-4DD7C59DECD4}.Debug|x86.Build.0 = Debug|Any CPU
+		{12D6C8E0-CA1B-41B4-8FB0-4DD7C59DECD4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{12D6C8E0-CA1B-41B4-8FB0-4DD7C59DECD4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{12D6C8E0-CA1B-41B4-8FB0-4DD7C59DECD4}.Release|x64.ActiveCfg = Release|Any CPU
+		{12D6C8E0-CA1B-41B4-8FB0-4DD7C59DECD4}.Release|x64.Build.0 = Release|Any CPU
+		{12D6C8E0-CA1B-41B4-8FB0-4DD7C59DECD4}.Release|x86.ActiveCfg = Release|Any CPU
+		{12D6C8E0-CA1B-41B4-8FB0-4DD7C59DECD4}.Release|x86.Build.0 = Release|Any CPU
+		{68BB3934-579C-46E0-94EA-3722C562F18E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{68BB3934-579C-46E0-94EA-3722C562F18E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{68BB3934-579C-46E0-94EA-3722C562F18E}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{68BB3934-579C-46E0-94EA-3722C562F18E}.Debug|x64.Build.0 = Debug|Any CPU
+		{68BB3934-579C-46E0-94EA-3722C562F18E}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{68BB3934-579C-46E0-94EA-3722C562F18E}.Debug|x86.Build.0 = Debug|Any CPU
+		{68BB3934-579C-46E0-94EA-3722C562F18E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{68BB3934-579C-46E0-94EA-3722C562F18E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{68BB3934-579C-46E0-94EA-3722C562F18E}.Release|x64.ActiveCfg = Release|Any CPU
+		{68BB3934-579C-46E0-94EA-3722C562F18E}.Release|x64.Build.0 = Release|Any CPU
+		{68BB3934-579C-46E0-94EA-3722C562F18E}.Release|x86.ActiveCfg = Release|Any CPU
+		{68BB3934-579C-46E0-94EA-3722C562F18E}.Release|x86.Build.0 = Release|Any CPU
+		{7F062EAF-3E5B-4C9B-9A1A-BA36D120B3DE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7F062EAF-3E5B-4C9B-9A1A-BA36D120B3DE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7F062EAF-3E5B-4C9B-9A1A-BA36D120B3DE}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{7F062EAF-3E5B-4C9B-9A1A-BA36D120B3DE}.Debug|x64.Build.0 = Debug|Any CPU
+		{7F062EAF-3E5B-4C9B-9A1A-BA36D120B3DE}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{7F062EAF-3E5B-4C9B-9A1A-BA36D120B3DE}.Debug|x86.Build.0 = Debug|Any CPU
+		{7F062EAF-3E5B-4C9B-9A1A-BA36D120B3DE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7F062EAF-3E5B-4C9B-9A1A-BA36D120B3DE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7F062EAF-3E5B-4C9B-9A1A-BA36D120B3DE}.Release|x64.ActiveCfg = Release|Any CPU
+		{7F062EAF-3E5B-4C9B-9A1A-BA36D120B3DE}.Release|x64.Build.0 = Release|Any CPU
+		{7F062EAF-3E5B-4C9B-9A1A-BA36D120B3DE}.Release|x86.ActiveCfg = Release|Any CPU
+		{7F062EAF-3E5B-4C9B-9A1A-BA36D120B3DE}.Release|x86.Build.0 = Release|Any CPU
+		{7F8C6504-A5DC-4E9A-927C-0CA1FDC495B4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7F8C6504-A5DC-4E9A-927C-0CA1FDC495B4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7F8C6504-A5DC-4E9A-927C-0CA1FDC495B4}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{7F8C6504-A5DC-4E9A-927C-0CA1FDC495B4}.Debug|x64.Build.0 = Debug|Any CPU
+		{7F8C6504-A5DC-4E9A-927C-0CA1FDC495B4}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{7F8C6504-A5DC-4E9A-927C-0CA1FDC495B4}.Debug|x86.Build.0 = Debug|Any CPU
+		{7F8C6504-A5DC-4E9A-927C-0CA1FDC495B4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7F8C6504-A5DC-4E9A-927C-0CA1FDC495B4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7F8C6504-A5DC-4E9A-927C-0CA1FDC495B4}.Release|x64.ActiveCfg = Release|Any CPU
+		{7F8C6504-A5DC-4E9A-927C-0CA1FDC495B4}.Release|x64.Build.0 = Release|Any CPU
+		{7F8C6504-A5DC-4E9A-927C-0CA1FDC495B4}.Release|x86.ActiveCfg = Release|Any CPU
+		{7F8C6504-A5DC-4E9A-927C-0CA1FDC495B4}.Release|x86.Build.0 = Release|Any CPU
+		{12E35E70-A7EA-449E-9F4C-A318D888F634}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{12E35E70-A7EA-449E-9F4C-A318D888F634}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{12E35E70-A7EA-449E-9F4C-A318D888F634}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{12E35E70-A7EA-449E-9F4C-A318D888F634}.Debug|x64.Build.0 = Debug|Any CPU
+		{12E35E70-A7EA-449E-9F4C-A318D888F634}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{12E35E70-A7EA-449E-9F4C-A318D888F634}.Debug|x86.Build.0 = Debug|Any CPU
+		{12E35E70-A7EA-449E-9F4C-A318D888F634}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{12E35E70-A7EA-449E-9F4C-A318D888F634}.Release|Any CPU.Build.0 = Release|Any CPU
+		{12E35E70-A7EA-449E-9F4C-A318D888F634}.Release|x64.ActiveCfg = Release|Any CPU
+		{12E35E70-A7EA-449E-9F4C-A318D888F634}.Release|x64.Build.0 = Release|Any CPU
+		{12E35E70-A7EA-449E-9F4C-A318D888F634}.Release|x86.ActiveCfg = Release|Any CPU
+		{12E35E70-A7EA-449E-9F4C-A318D888F634}.Release|x86.Build.0 = Release|Any CPU
+		{B975B1A0-581B-44E2-A83D-562AB88ED770}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B975B1A0-581B-44E2-A83D-562AB88ED770}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B975B1A0-581B-44E2-A83D-562AB88ED770}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B975B1A0-581B-44E2-A83D-562AB88ED770}.Debug|x64.Build.0 = Debug|Any CPU
+		{B975B1A0-581B-44E2-A83D-562AB88ED770}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B975B1A0-581B-44E2-A83D-562AB88ED770}.Debug|x86.Build.0 = Debug|Any CPU
+		{B975B1A0-581B-44E2-A83D-562AB88ED770}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B975B1A0-581B-44E2-A83D-562AB88ED770}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B975B1A0-581B-44E2-A83D-562AB88ED770}.Release|x64.ActiveCfg = Release|Any CPU
+		{B975B1A0-581B-44E2-A83D-562AB88ED770}.Release|x64.Build.0 = Release|Any CPU
+		{B975B1A0-581B-44E2-A83D-562AB88ED770}.Release|x86.ActiveCfg = Release|Any CPU
+		{B975B1A0-581B-44E2-A83D-562AB88ED770}.Release|x86.Build.0 = Release|Any CPU
+		{32CD399C-5090-4D48-ADE4-7AA66B00A400}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{32CD399C-5090-4D48-ADE4-7AA66B00A400}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{32CD399C-5090-4D48-ADE4-7AA66B00A400}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{32CD399C-5090-4D48-ADE4-7AA66B00A400}.Debug|x64.Build.0 = Debug|Any CPU
+		{32CD399C-5090-4D48-ADE4-7AA66B00A400}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{32CD399C-5090-4D48-ADE4-7AA66B00A400}.Debug|x86.Build.0 = Debug|Any CPU
+		{32CD399C-5090-4D48-ADE4-7AA66B00A400}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{32CD399C-5090-4D48-ADE4-7AA66B00A400}.Release|Any CPU.Build.0 = Release|Any CPU
+		{32CD399C-5090-4D48-ADE4-7AA66B00A400}.Release|x64.ActiveCfg = Release|Any CPU
+		{32CD399C-5090-4D48-ADE4-7AA66B00A400}.Release|x64.Build.0 = Release|Any CPU
+		{32CD399C-5090-4D48-ADE4-7AA66B00A400}.Release|x86.ActiveCfg = Release|Any CPU
+		{32CD399C-5090-4D48-ADE4-7AA66B00A400}.Release|x86.Build.0 = Release|Any CPU
+		{8210EEF9-6625-41DF-B372-F54A14F42746}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8210EEF9-6625-41DF-B372-F54A14F42746}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8210EEF9-6625-41DF-B372-F54A14F42746}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8210EEF9-6625-41DF-B372-F54A14F42746}.Debug|x64.Build.0 = Debug|Any CPU
+		{8210EEF9-6625-41DF-B372-F54A14F42746}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{8210EEF9-6625-41DF-B372-F54A14F42746}.Debug|x86.Build.0 = Debug|Any CPU
+		{8210EEF9-6625-41DF-B372-F54A14F42746}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8210EEF9-6625-41DF-B372-F54A14F42746}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8210EEF9-6625-41DF-B372-F54A14F42746}.Release|x64.ActiveCfg = Release|Any CPU
+		{8210EEF9-6625-41DF-B372-F54A14F42746}.Release|x64.Build.0 = Release|Any CPU
+		{8210EEF9-6625-41DF-B372-F54A14F42746}.Release|x86.ActiveCfg = Release|Any CPU
+		{8210EEF9-6625-41DF-B372-F54A14F42746}.Release|x86.Build.0 = Release|Any CPU
+		{65CD3AC8-DFDB-4785-9A18-FD9C93AD1575}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{65CD3AC8-DFDB-4785-9A18-FD9C93AD1575}.Debug|Any CPU.Build.0 = Debug|x64
+		{65CD3AC8-DFDB-4785-9A18-FD9C93AD1575}.Debug|x64.ActiveCfg = Debug|x64
+		{65CD3AC8-DFDB-4785-9A18-FD9C93AD1575}.Debug|x64.Build.0 = Debug|x64
+		{65CD3AC8-DFDB-4785-9A18-FD9C93AD1575}.Debug|x86.ActiveCfg = Debug|x64
+		{65CD3AC8-DFDB-4785-9A18-FD9C93AD1575}.Debug|x86.Build.0 = Debug|x64
+		{65CD3AC8-DFDB-4785-9A18-FD9C93AD1575}.Release|Any CPU.ActiveCfg = Release|x64
+		{65CD3AC8-DFDB-4785-9A18-FD9C93AD1575}.Release|Any CPU.Build.0 = Release|x64
+		{65CD3AC8-DFDB-4785-9A18-FD9C93AD1575}.Release|x64.ActiveCfg = Release|x64
+		{65CD3AC8-DFDB-4785-9A18-FD9C93AD1575}.Release|x64.Build.0 = Release|x64
+		{65CD3AC8-DFDB-4785-9A18-FD9C93AD1575}.Release|x86.ActiveCfg = Release|x64
+		{65CD3AC8-DFDB-4785-9A18-FD9C93AD1575}.Release|x86.Build.0 = Release|x64
+		{FF0ADA8A-8E51-4EDD-9116-2D76A0C1C34F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FF0ADA8A-8E51-4EDD-9116-2D76A0C1C34F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FF0ADA8A-8E51-4EDD-9116-2D76A0C1C34F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{FF0ADA8A-8E51-4EDD-9116-2D76A0C1C34F}.Debug|x64.Build.0 = Debug|Any CPU
+		{FF0ADA8A-8E51-4EDD-9116-2D76A0C1C34F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{FF0ADA8A-8E51-4EDD-9116-2D76A0C1C34F}.Debug|x86.Build.0 = Debug|Any CPU
+		{FF0ADA8A-8E51-4EDD-9116-2D76A0C1C34F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FF0ADA8A-8E51-4EDD-9116-2D76A0C1C34F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FF0ADA8A-8E51-4EDD-9116-2D76A0C1C34F}.Release|x64.ActiveCfg = Release|Any CPU
+		{FF0ADA8A-8E51-4EDD-9116-2D76A0C1C34F}.Release|x64.Build.0 = Release|Any CPU
+		{FF0ADA8A-8E51-4EDD-9116-2D76A0C1C34F}.Release|x86.ActiveCfg = Release|Any CPU
+		{FF0ADA8A-8E51-4EDD-9116-2D76A0C1C34F}.Release|x86.Build.0 = Release|Any CPU
+		{A1E17B2E-BE8C-4336-8779-429EB3E6CDEE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1E17B2E-BE8C-4336-8779-429EB3E6CDEE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1E17B2E-BE8C-4336-8779-429EB3E6CDEE}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A1E17B2E-BE8C-4336-8779-429EB3E6CDEE}.Debug|x64.Build.0 = Debug|Any CPU
+		{A1E17B2E-BE8C-4336-8779-429EB3E6CDEE}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A1E17B2E-BE8C-4336-8779-429EB3E6CDEE}.Debug|x86.Build.0 = Debug|Any CPU
+		{A1E17B2E-BE8C-4336-8779-429EB3E6CDEE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1E17B2E-BE8C-4336-8779-429EB3E6CDEE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1E17B2E-BE8C-4336-8779-429EB3E6CDEE}.Release|x64.ActiveCfg = Release|Any CPU
+		{A1E17B2E-BE8C-4336-8779-429EB3E6CDEE}.Release|x64.Build.0 = Release|Any CPU
+		{A1E17B2E-BE8C-4336-8779-429EB3E6CDEE}.Release|x86.ActiveCfg = Release|Any CPU
+		{A1E17B2E-BE8C-4336-8779-429EB3E6CDEE}.Release|x86.Build.0 = Release|Any CPU
+		{E2BE7BC2-55A4-4402-9428-D86AE38A410F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E2BE7BC2-55A4-4402-9428-D86AE38A410F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E2BE7BC2-55A4-4402-9428-D86AE38A410F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E2BE7BC2-55A4-4402-9428-D86AE38A410F}.Debug|x64.Build.0 = Debug|Any CPU
+		{E2BE7BC2-55A4-4402-9428-D86AE38A410F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E2BE7BC2-55A4-4402-9428-D86AE38A410F}.Debug|x86.Build.0 = Debug|Any CPU
+		{E2BE7BC2-55A4-4402-9428-D86AE38A410F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E2BE7BC2-55A4-4402-9428-D86AE38A410F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E2BE7BC2-55A4-4402-9428-D86AE38A410F}.Release|x64.ActiveCfg = Release|Any CPU
+		{E2BE7BC2-55A4-4402-9428-D86AE38A410F}.Release|x64.Build.0 = Release|Any CPU
+		{E2BE7BC2-55A4-4402-9428-D86AE38A410F}.Release|x86.ActiveCfg = Release|Any CPU
+		{E2BE7BC2-55A4-4402-9428-D86AE38A410F}.Release|x86.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{12D6C8E0-CA1B-41B4-8FB0-4DD7C59DECD4} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{68BB3934-579C-46E0-94EA-3722C562F18E} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{7F062EAF-3E5B-4C9B-9A1A-BA36D120B3DE} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{7F8C6504-A5DC-4E9A-927C-0CA1FDC495B4} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{12E35E70-A7EA-449E-9F4C-A318D888F634} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{B975B1A0-581B-44E2-A83D-562AB88ED770} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{32CD399C-5090-4D48-ADE4-7AA66B00A400} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{8210EEF9-6625-41DF-B372-F54A14F42746} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{65CD3AC8-DFDB-4785-9A18-FD9C93AD1575} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{FF0ADA8A-8E51-4EDD-9116-2D76A0C1C34F} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{A1E17B2E-BE8C-4336-8779-429EB3E6CDEE} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{E2BE7BC2-55A4-4402-9428-D86AE38A410F} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+	EndGlobalSection
+EndGlobal
+</file>
+
+<file path="tests/AegisDNS.Licensing.Tests/AegisDNS.Licensing.Tests.csproj">
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AegisDNS.Licensing\AegisDNS.Licensing.csproj" />
+  </ItemGroup>
+
+</Project>
+</file>
+
+</files>

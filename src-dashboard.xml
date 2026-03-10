@@ -1,0 +1,1434 @@
+This file is a merged representation of a subset of the codebase, containing specifically included files, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Only files matching these patterns are included: src/AegisDNS.WebDashboard/**/*.cs, src/AegisDNS.WebDashboard/**/*.html, src/AegisDNS.WebDashboard/**/*.js, src/AegisDNS.WebDashboard/**/*.css
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+src/
+  AegisDNS.WebDashboard/
+    wwwroot/
+      index.html
+    WebDashboardHost.cs
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="src/AegisDNS.WebDashboard/wwwroot/index.html">
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AegisDNS — Network Protection Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;700&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070d18;
+      --bg2: #0d1626;
+      --bg3: #111e34;
+      --panel: #0f1c2e;
+      --border: #1a2d4a;
+      --cyan: #00e5ff;
+      --cyan-dim: #0097a7;
+      --blue: #0288d1;
+      --text: #c8ddf0;
+      --muted: #4a6a8a;
+      --green: #00e676;
+      --red: #ff1744;
+      --orange: #ff9100;
+      --font-mono: 'Share Tech Mono', monospace;
+      --font-ui: 'Exo 2', sans-serif;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-ui);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── ANIMATED BACKGROUND ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% 20%, rgba(0, 133, 209, 0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 80%, rgba(0, 229, 255, 0.04) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── GRID OVERLAY ── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0, 229, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 229, 255, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── TOPBAR ── */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      height: 58px;
+      background: rgba(7, 13, 24, 0.95);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-shield {
+      width: 32px;
+      height: 32px;
+    }
+
+    .logo-text {
+      font-family: var(--font-ui);
+      font-weight: 700;
+      font-size: 18px;
+      letter-spacing: 3px;
+    }
+
+    .logo-text span {
+      color: var(--cyan);
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 14px;
+      border-radius: 20px;
+      background: rgba(0, 230, 118, 0.08);
+      border: 1px solid rgba(0, 230, 118, 0.25);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 1px;
+      color: var(--green);
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: 0.5;
+        transform: scale(0.8);
+      }
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .tier-badge {
+      padding: 3px 10px;
+      border-radius: 4px;
+      background: rgba(2, 136, 209, 0.2);
+      border: 1px solid rgba(2, 136, 209, 0.4);
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--blue);
+      font-family: var(--font-mono);
+    }
+
+    .uptime-text {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* ── NAV ── */
+    .nav {
+      display: flex;
+      gap: 2px;
+      padding: 0 28px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      z-index: 10;
+    }
+
+    .nav-btn {
+      padding: 10px 18px;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--muted);
+      font-family: var(--font-ui);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+    }
+
+    .nav-btn:hover {
+      color: var(--text);
+    }
+
+    .nav-btn.active {
+      color: var(--cyan);
+      border-bottom-color: var(--cyan);
+    }
+
+    /* ── LAYOUT ── */
+    .main {
+      position: relative;
+      z-index: 1;
+      padding: 24px 28px;
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    /* ── STAT CARDS ── */
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px 22px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+    }
+
+    .stat-card.cyan::before {
+      background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    }
+
+    .stat-card.green::before {
+      background: linear-gradient(90deg, transparent, var(--green), transparent);
+    }
+
+    .stat-card.blue::before {
+      background: linear-gradient(90deg, transparent, var(--blue), transparent);
+    }
+
+    .stat-card.orange::before {
+      background: linear-gradient(90deg, transparent, var(--orange), transparent);
+    }
+
+    .stat-card:hover {
+      border-color: rgba(0, 229, 255, 0.3);
+    }
+
+    .stat-label {
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-family: var(--font-mono);
+      font-size: 32px;
+      font-weight: 400;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .stat-value.cyan {
+      color: var(--cyan);
+    }
+
+    .stat-value.green {
+      color: var(--green);
+    }
+
+    .stat-value.blue {
+      color: var(--blue);
+    }
+
+    .stat-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    /* ── GRID PANELS ── */
+    .panel-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .panel-grid-3 {
+      grid-template-columns: 1.6fr 1fr 1fr;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .panel-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--cyan);
+    }
+
+    .panel-action {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 1px;
+      cursor: pointer;
+      background: none;
+      border: none;
+      font-family: var(--font-ui);
+    }
+
+    .panel-action:hover {
+      color: var(--cyan);
+    }
+
+    .panel-body {
+      padding: 16px 20px;
+    }
+
+    /* ── LIVE LOG ── */
+    .live-log {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      height: 260px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 3px;
+    }
+
+    .live-log::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .live-log::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .live-log::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px;
+    }
+
+    .log-entry {
+      display: flex;
+      gap: 10px;
+      padding: 3px 0;
+      border-bottom: 1px solid rgba(26, 45, 74, 0.5);
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-4px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .log-ts {
+      color: var(--muted);
+      min-width: 80px;
+    }
+
+    .log-msg {
+      color: var(--text);
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .log-msg.blocked {
+      color: var(--red);
+    }
+
+    .log-msg.allowed {
+      color: var(--green);
+    }
+
+    .log-msg.cached {
+      color: var(--cyan-dim);
+    }
+
+    /* ── BAR CHART (top blocked) ── */
+    .domain-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .domain-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .domain-name {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text);
+      min-width: 0;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .domain-bar-wrap {
+      width: 100px;
+      height: 6px;
+      background: var(--bg3);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .domain-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--cyan-dim), var(--cyan));
+      border-radius: 3px;
+      transition: width 0.6s ease;
+    }
+
+    .domain-count {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      min-width: 32px;
+      text-align: right;
+    }
+
+    /* ── BLOCK RATE DONUT ── */
+    .donut-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 0 10px;
+    }
+
+    .donut-svg {
+      transform: rotate(-90deg);
+    }
+
+    .donut-center {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .donut-pct {
+      font-family: var(--font-mono);
+      font-size: 28px;
+      color: var(--cyan);
+    }
+
+    .donut-lbl {
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    /* ── QUERY INPUT ── */
+    .input-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .dns-input {
+      flex: 1;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 9px 14px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .dns-input:focus {
+      border-color: var(--cyan);
+    }
+
+    .dns-input::placeholder {
+      color: var(--muted);
+    }
+
+    .btn {
+      padding: 9px 16px;
+      border-radius: 6px;
+      border: none;
+      font-family: var(--font-ui);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-cyan {
+      background: rgba(0, 229, 255, 0.12);
+      border: 1px solid rgba(0, 229, 255, 0.35);
+      color: var(--cyan);
+    }
+
+    .btn-cyan:hover {
+      background: rgba(0, 229, 255, 0.2);
+      box-shadow: 0 0 12px rgba(0, 229, 255, 0.2);
+    }
+
+    .btn-red {
+      background: rgba(255, 23, 68, 0.12);
+      border: 1px solid rgba(255, 23, 68, 0.35);
+      color: var(--red);
+    }
+
+    .btn-red:hover {
+      background: rgba(255, 23, 68, 0.2);
+    }
+
+    /* ── POLICY TABLE ── */
+    .policy-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .policy-table th {
+      text-align: left;
+      padding: 8px 12px;
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .policy-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(26, 45, 74, 0.5);
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .policy-table tr:hover td {
+      background: rgba(0, 229, 255, 0.03);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 10px;
+      letter-spacing: 1px;
+    }
+
+    .badge-allow {
+      background: rgba(0, 230, 118, 0.12);
+      color: var(--green);
+      border: 1px solid rgba(0, 230, 118, 0.25);
+    }
+
+    .badge-block {
+      background: rgba(255, 23, 68, 0.12);
+      color: var(--red);
+      border: 1px solid rgba(255, 23, 68, 0.25);
+    }
+
+    /* ── TABS ── */
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* ── EMPTY STATE ── */
+    .empty {
+      text-align: center;
+      padding: 40px;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 1px;
+    }
+
+    /* ── TOAST ── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 12px 20px;
+      border-radius: 6px;
+      background: var(--panel);
+      border: 1px solid var(--cyan);
+      color: var(--cyan);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      z-index: 999;
+      transform: translateY(80px);
+      opacity: 0;
+      transition: all 0.3s ease;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    /* ── LOADING ── */
+    .loading {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid var(--border);
+      border-top-color: var(--cyan);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 1100px) {
+      .stat-row {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .panel-grid,
+      .panel-grid-3 {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="logo">
+      <!-- Inline shield SVG -->
+      <svg class="logo-shield" viewBox="0 0 80 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="sg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#4fc3f7" />
+            <stop offset="100%" stop-color="#01579b" />
+          </linearGradient>
+          <linearGradient id="og" x1="0" y1="0.5" x2="1" y2="0.5">
+            <stop offset="0%" stop-color="#00e5ff" stop-opacity="0" />
+            <stop offset="40%" stop-color="#00e5ff" />
+            <stop offset="60%" stop-color="#00e5ff" />
+            <stop offset="100%" stop-color="#00e5ff" stop-opacity="0" />
+          </linearGradient>
+        </defs>
+        <path d="M40 4 C40 4 8 13 4 30 L4 52 C4 70 20 83 40 89 C60 83 76 70 76 52 L76 30 C72 13 40 4 40 4Z"
+          fill="url(#sg)" stroke="#90caf9" stroke-width="1.5" />
+        <path d="M40 12 C40 12 14 20 11 34 L11 52 C11 67 24 78 40 84 C56 78 69 67 69 52 L69 34 C66 20 40 12 40 12Z"
+          fill="#050e1e" opacity="0.88" />
+        <g stroke="#00e5ff" stroke-width="1" opacity="0.7">
+          <line x1="40" y1="26" x2="24" y2="46" />
+          <line x1="40" y1="26" x2="56" y2="46" />
+          <line x1="24" y1="46" x2="40" y2="62" />
+          <line x1="56" y1="46" x2="40" y2="62" />
+          <line x1="24" y1="46" x2="56" y2="46" />
+        </g>
+        <circle cx="40" cy="26" r="3.5" fill="#00e5ff" filter="url(#f1)" />
+        <circle cx="24" cy="46" r="2.5" fill="#00e5ff" />
+        <circle cx="56" cy="46" r="2.5" fill="#00e5ff" />
+        <circle cx="40" cy="62" r="3" fill="#00e5ff" />
+        <ellipse cx="40" cy="50" rx="38" ry="12" fill="none" stroke="url(#og)" stroke-width="1.8"
+          transform="rotate(-15 40 50)" />
+      </svg>
+      <div class="logo-text">AEGIS<span>DNS</span></div>
+    </div>
+
+    <div class="status-pill">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">CONNECTING...</span>
+    </div>
+
+    <div class="topbar-right">
+      <span class="tier-badge" id="tierBadge">–</span>
+      <span class="uptime-text" id="uptimeText">–</span>
+    </div>
+  </div>
+
+  <!-- NAV -->
+  <div class="nav">
+    <button class="nav-btn active" onclick="switchTab('dashboard')">Dashboard</button>
+    <button class="nav-btn" onclick="switchTab('traffic')">Live Traffic</button>
+    <button class="nav-btn" onclick="switchTab('blocklist')">Blocklist</button>
+    <button class="nav-btn" onclick="switchTab('policies')">Policies</button>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- ── DASHBOARD TAB ── -->
+    <div id="tab-dashboard" class="tab-content active">
+
+      <div class="stat-row">
+        <div class="stat-card cyan">
+          <div class="stat-label">Total Queries</div>
+          <div class="stat-value" id="totalQ">–</div>
+          <div class="stat-sub">Since service start</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-label">Blocked</div>
+          <div class="stat-value green" id="blockedQ">–</div>
+          <div class="stat-sub" id="blockPct">–% block rate</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-label">Cache Hits</div>
+          <div class="stat-value blue" id="cacheHits">–</div>
+          <div class="stat-sub" id="cachePct">–% cache rate</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-label">Uptime</div>
+          <div class="stat-value" style="font-size:20px;padding-top:6px" id="uptimeStat">–</div>
+          <div class="stat-sub">Continuous protection</div>
+        </div>
+      </div>
+
+      <div class="panel-grid panel-grid-3">
+
+        <!-- Live log preview -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Live DNS Feed</span>
+            <button class="panel-action" onclick="switchTab('traffic')">Full view →</button>
+          </div>
+          <div class="panel-body">
+            <div class="live-log" id="dashLog"></div>
+          </div>
+        </div>
+
+        <!-- Top blocked domains -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Top Blocked</span>
+          </div>
+          <div class="panel-body">
+            <div class="domain-list" id="topBlocked"></div>
+          </div>
+        </div>
+
+        <!-- Block rate donut -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Block Rate</span>
+          </div>
+          <div class="panel-body" style="display:flex;flex-direction:column;align-items:center;gap:16px">
+            <div style="position:relative;display:flex;align-items:center;justify-content:center">
+              <svg class="donut-svg" width="140" height="140" viewBox="0 0 140 140">
+                <circle cx="70" cy="70" r="54" fill="none" stroke="#1a2d4a" stroke-width="14" />
+                <circle cx="70" cy="70" r="54" fill="none" stroke="#00e5ff" stroke-width="14" stroke-dasharray="339.3"
+                  id="donutArc" stroke-dashoffset="339.3" stroke-linecap="round"
+                  style="transition:stroke-dashoffset 1s ease;filter:drop-shadow(0 0 6px #00e5ff)" />
+              </svg>
+              <div class="donut-center" style="position:absolute">
+                <div class="donut-pct" id="donutPct">0%</div>
+                <div class="donut-lbl">blocked</div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%">
+              <div style="text-align:center">
+                <div style="font-size:10px;letter-spacing:2px;color:var(--muted)">ALLOWED</div>
+                <div style="font-family:var(--font-mono);color:var(--green)" id="allowedCount">–</div>
+              </div>
+              <div style="text-align:center">
+                <div style="font-size:10px;letter-spacing:2px;color:var(--muted)">BLOCKED</div>
+                <div style="font-family:var(--font-mono);color:var(--red)" id="blockedCount">–</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── TRAFFIC TAB ── -->
+    <div id="tab-traffic" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Live DNS Traffic — WebSocket Feed</span>
+          <div style="display:flex;gap:8px">
+            <span id="wsStatus" style="font-size:10px;color:var(--muted)">CONNECTING</span>
+            <button class="panel-action" onclick="clearLog()">Clear</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="live-log" id="fullLog" style="height:500px;flex-direction:column"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── BLOCKLIST TAB ── -->
+    <div id="tab-blocklist" class="tab-content">
+      <div class="panel-grid">
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Block a Domain</span></div>
+          <div class="panel-body">
+            <div style="margin-bottom:12px;font-size:12px;color:var(--muted)">
+              Add a domain to the live blocklist. Takes effect immediately — no restart required.
+            </div>
+            <div class="input-row">
+              <input class="dns-input" id="blockInput" placeholder="ads.example.com" type="text" />
+              <button class="btn btn-red" onclick="blockDomain()">BLOCK</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Allow a Domain</span></div>
+          <div class="panel-body">
+            <div style="margin-bottom:12px;font-size:12px;color:var(--muted)">
+              Add a domain to the allowlist. Always resolves regardless of blocklist rules.
+            </div>
+            <div class="input-row">
+              <input class="dns-input" id="allowInput" placeholder="my.domain.com" type="text" />
+              <button class="btn btn-cyan" onclick="allowDomain()">ALLOW</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:16px">
+        <div class="panel-header"><span class="panel-title">Top Blocked Domains</span></div>
+        <div class="panel-body">
+          <table class="policy-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Domain</th>
+                <th>Block Count</th>
+                <th>Bar</th>
+              </tr>
+            </thead>
+            <tbody id="topBlockedTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── POLICIES TAB ── -->
+    <div id="tab-policies" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Device Policies</span>
+          <button class="panel-action" onclick="loadPolicies()">↺ Refresh</button>
+        </div>
+        <div class="panel-body">
+          <div id="policyList"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const API = '';  // same origin
+
+    // ── STATE ──
+    let ws = null;
+    let logEntries = [];
+    let statsData = null;
+
+    // ── INIT ──
+    document.addEventListener('DOMContentLoaded', () => {
+      fetchStats();
+      fetchTopBlocked();
+      connectWebSocket();
+      setInterval(fetchStats, 5000);
+      setInterval(fetchTopBlocked, 15000);
+    });
+
+    // ── TAB SWITCHING ──
+    function switchTab(name) {
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.add('active');
+      event.target.classList.add('active');
+      if (name === 'policies') loadPolicies();
+      if (name === 'blocklist') renderTopBlockedTable();
+    }
+
+    // ── STATS ──
+    async function fetchStats() {
+      try {
+        const r = await fetch(API + '/api/status');
+        const d = await r.json();
+        statsData = d;
+
+        document.getElementById('totalQ').textContent = fmt(d.total);
+        document.getElementById('blockedQ').textContent = fmt(d.blocked);
+        document.getElementById('cacheHits').textContent = fmt(d.cacheHits);
+        document.getElementById('uptimeStat').textContent = d.uptime;
+        document.getElementById('uptimeText').textContent = d.uptime;
+        document.getElementById('tierBadge').textContent = d.tier.toUpperCase();
+
+        const pct = d.total > 0 ? Math.round((d.blocked / d.total) * 100) : 0;
+        document.getElementById('blockPct').textContent = pct + '% block rate';
+        document.getElementById('blockPct').textContent = pct + '% block rate';
+
+        const cpct = d.total > 0 ? Math.round((d.cacheHits / d.total) * 100) : 0;
+        document.getElementById('cachePct').textContent = cpct + '% cache rate';
+
+        // Donut
+        const circ = 339.3;
+        const offset = circ - (pct / 100) * circ;
+        document.getElementById('donutArc').style.strokeDashoffset = offset;
+        document.getElementById('donutPct').textContent = pct + '%';
+        document.getElementById('allowedCount').textContent = fmt(d.total - d.blocked);
+        document.getElementById('blockedCount').textContent = fmt(d.blocked);
+
+        // Status
+        document.getElementById('statusDot').style.background = '#00e676';
+        document.getElementById('statusDot').style.boxShadow = '0 0 8px #00e676';
+        document.getElementById('statusText').textContent = 'PROTECTED';
+
+      } catch (e) {
+        document.getElementById('statusDot').style.background = '#ff1744';
+        document.getElementById('statusDot').style.boxShadow = '0 0 8px #ff1744';
+        document.getElementById('statusText').textContent = 'OFFLINE';
+      }
+    }
+
+    // ── TOP BLOCKED ──
+    let topData = [];
+    async function fetchTopBlocked() {
+      try {
+        const r = await fetch(API + '/api/metrics/top-blocked');
+        topData = await r.json();
+        renderTopBlocked();
+        renderTopBlockedTable();
+      } catch (e) { }
+    }
+
+    function renderTopBlocked() {
+      const el = document.getElementById('topBlocked');
+      if (!topData.length) { el.innerHTML = '<div class="empty">No blocked domains yet</div>'; return; }
+      const max = topData[0].count || 1;
+      el.innerHTML = topData.slice(0, 8).map(d => `
+      <div class="domain-row">
+        <div class="domain-name">${esc(d.domain)}</div>
+        <div class="domain-bar-wrap">
+          <div class="domain-bar" style="width:${Math.round((d.count / max) * 100)}%"></div>
+        </div>
+        <div class="domain-count">${d.count}</div>
+      </div>`).join('');
+    }
+
+    function renderTopBlockedTable() {
+      const el = document.getElementById('topBlockedTable');
+      if (!el) return;
+      if (!topData.length) { el.innerHTML = '<tr><td colspan="4" class="empty">No data</td></tr>'; return; }
+      const max = topData[0].count || 1;
+      el.innerHTML = topData.map((d, i) => `
+      <tr>
+        <td style="color:var(--muted)">${i + 1}</td>
+        <td>${esc(d.domain)}</td>
+        <td style="color:var(--red)">${d.count}</td>
+        <td><div class="domain-bar-wrap" style="width:120px">
+          <div class="domain-bar" style="width:${Math.round((d.count / max) * 100)}%"></div>
+        </div></td>
+      </tr>`).join('');
+    }
+
+    // ── WEBSOCKET LIVE FEED ──
+    function connectWebSocket() {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${proto}//${location.host}/ws/live`);
+
+      ws.onopen = () => {
+        document.getElementById('wsStatus').textContent = 'LIVE';
+        document.getElementById('wsStatus').style.color = 'var(--green)';
+      };
+
+      ws.onclose = () => {
+        document.getElementById('wsStatus').textContent = 'RECONNECTING';
+        document.getElementById('wsStatus').style.color = 'var(--orange)';
+        setTimeout(connectWebSocket, 3000);
+      };
+
+      ws.onmessage = (ev) => {
+        try {
+          const d = JSON.parse(ev.data);
+          addLogEntry(d.ts, d.msg);
+        } catch (e) { }
+      };
+    }
+
+    function addLogEntry(ts, msg) {
+      const time = new Date(ts).toLocaleTimeString('en-US', { hour12: false });
+      const isBlocked = msg.includes('BLOCKED') || msg.includes('blocked');
+      const isCached = msg.includes('CACHE') || msg.includes('cached');
+      const cls = isBlocked ? 'blocked' : isCached ? 'cached' : 'allowed';
+
+      logEntries.unshift({ time, msg, cls });
+      if (logEntries.length > 500) logEntries.pop();
+
+      renderLog('dashLog', logEntries.slice(0, 20));
+      renderLog('fullLog', logEntries, false);
+    }
+
+    function renderLog(id, entries, reverse = true) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const html = entries.map(e => `
+      <div class="log-entry">
+        <span class="log-ts">${e.time}</span>
+        <span class="log-msg ${e.cls}">${esc(e.msg)}</span>
+      </div>`).join('');
+      el.innerHTML = html || '<div class="empty">Waiting for DNS queries...</div>';
+    }
+
+    function clearLog() {
+      logEntries = [];
+      renderLog('fullLog', []);
+    }
+
+    // ── BLOCKLIST ACTIONS ──
+    async function blockDomain() {
+      const domain = document.getElementById('blockInput').value.trim();
+      if (!domain) return;
+      try {
+        await fetch(API + '/api/blocklist/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ domain })
+        });
+        toast(`Blocked: ${domain}`);
+        document.getElementById('blockInput').value = '';
+      } catch (e) { toast('Error — is AegisDNS running?', true); }
+    }
+
+    async function allowDomain() {
+      const domain = document.getElementById('allowInput').value.trim();
+      if (!domain) return;
+      try {
+        await fetch(API + '/api/allowlist/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ domain })
+        });
+        toast(`Allowed: ${domain}`);
+        document.getElementById('allowInput').value = '';
+      } catch (e) { toast('Error — is AegisDNS running?', true); }
+    }
+
+    // ── POLICIES ──
+    async function loadPolicies() {
+      const el = document.getElementById('policyList');
+      el.innerHTML = '<div class="empty"><span class="loading"></span></div>';
+      try {
+        const r = await fetch(API + '/api/policies');
+        const policies = await r.json();
+        if (!policies.length) {
+          el.innerHTML = '<div class="empty">No device policies configured</div>';
+          return;
+        }
+        el.innerHTML = `
+        <table class="policy-table">
+          <thead>
+            <tr><th>Device</th><th>MAC</th><th>Group</th><th>SafeSearch</th><th>Default</th></tr>
+          </thead>
+          <tbody>
+            ${policies.map(p => `
+              <tr>
+                <td>${esc(p.deviceName)}</td>
+                <td>${esc(p.mac)}</td>
+                <td>${esc(p.groupId || '—')}</td>
+                <td><span class="badge ${p.safeSearchEnabled ? 'badge-allow' : 'badge-block'}">${p.safeSearchEnabled ? 'ON' : 'OFF'}</span></td>
+                <td><span class="badge ${p.blockAllByDefault ? 'badge-block' : 'badge-allow'}">${p.blockAllByDefault ? 'BLOCK' : 'ALLOW'}</span></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+      } catch (e) {
+        el.innerHTML = '<div class="empty">Failed to load policies</div>';
+      }
+    }
+
+    // ── HELPERS ──
+    function fmt(n) {
+      if (n === undefined || n === null) return '–';
+      return n.toLocaleString();
+    }
+
+    function esc(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function toast(msg, isErr = false) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.style.borderColor = isErr ? 'var(--red)' : 'var(--cyan)';
+      el.style.color = isErr ? 'var(--red)' : 'var(--cyan)';
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 3000);
+    }
+
+    // Load history on boot for the log
+    (async () => {
+      try {
+        const r = await fetch(API + '/api/history?limit=50');
+        const hist = await r.json();
+        hist.reverse().forEach(h => {
+          logEntries.unshift({ time: new Date(h.timestamp || Date.now()).toLocaleTimeString('en-US', { hour12: false }), msg: h.domain || JSON.stringify(h), cls: h.blocked ? 'blocked' : 'allowed' });
+        });
+        renderLog('dashLog', logEntries.slice(0, 20));
+        renderLog('fullLog', logEntries, false);
+      } catch (e) { }
+    })();
+  </script>
+</body>
+
+</html>
+</file>
+
+<file path="src/AegisDNS.WebDashboard/WebDashboardHost.cs">
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net.WebSockets;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+
+using AegisDNS.Core;
+using AegisDNS.Core.PolicyEngine;
+
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.WebSockets;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+namespace AegisDNS.WebDashboard;
+
+/// <summary>
+/// AegisDNS Web Management Dashboard — serves on :8080 by default.
+/// REST API + WebSocket live DNS feed + embedded SPA frontend.
+/// Pro+ tier only — checked by caller before starting.
+/// </summary>
+public class WebDashboardHost
+{
+    private WebApplication? _app;
+    private readonly AegisEngine _engine;
+    private readonly ILogger<WebDashboardHost> _logger;
+    private readonly DevicePolicyEngine _policyEngine;
+    private readonly ConcurrentBag<WebSocket> _liveClients = new();
+
+    public WebDashboardHost(AegisEngine engine, DevicePolicyEngine policyEngine, ILogger<WebDashboardHost> logger)
+    {
+        _engine = engine;
+        _policyEngine = policyEngine;
+        _logger = logger;
+        _engine.LogReceived += OnLogReceived;
+    }
+
+    public async Task StartAsync(int port = 8080, CancellationToken ct = default)
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.Services.AddSingleton(_engine);
+        builder.Services.AddSingleton(_policyEngine);
+        builder.Services.AddWebSockets(opts => opts.KeepAliveInterval = TimeSpan.FromSeconds(30));
+        builder.Services.AddCors(opts =>
+            opts.AddDefaultPolicy(p => p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
+        builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+
+        _app = builder.Build();
+        _app.UseCors();
+        _app.UseWebSockets();
+        _app.UseDefaultFiles();
+        _app.UseStaticFiles();
+        MapEndpoints(_app);
+        await _app.StartAsync(ct);
+    }
+
+    public async Task StopAsync() => await (_app?.StopAsync() ?? Task.CompletedTask);
+
+    private void MapEndpoints(WebApplication app)
+    {
+        app.MapGet("/api/status", () => Results.Json(new
+        {
+            total = MetricsManager.Current.TotalQueries,
+            blocked = MetricsManager.Current.BlockedQueries,
+            cacheHits = MetricsManager.Current.CacheHits,
+            uptime = (DateTime.UtcNow - System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime()).ToString(@"d\.hh\:mm\:ss"),
+            version = "0.0.2",
+            tier = AegisDNS.Licensing.LicenseManager.CurrentTier.ToString()
+        }));
+
+        app.MapGet("/api/history", (int limit = 100) =>
+            Results.Json(_engine.GetHistory().Take(limit)));
+
+        app.MapGet("/api/policies", () =>
+            Results.Json(_policyEngine.GetAllPolicies()));
+
+        app.MapPost("/api/policies", async (HttpRequest req) =>
+        {
+            try
+            {
+                DevicePolicy? policy;
+                try
+                {
+                    policy = await JsonSerializer.DeserializeAsync<DevicePolicy>(req.Body);
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogWarning(ex, "JSON invalid.");
+                    return Results.BadRequest("Invalid request body");
+                }
+                if (policy == null) return Results.BadRequest("Invalid policy JSON");
+                _policyEngine.SaveDevicePolicy(policy);
+                return Results.Ok(new { saved = true });
+            }
+            catch (Exception ex) { return Results.BadRequest(ex.Message); }
+        });
+
+        app.MapGet("/api/groups", () =>
+            Results.Json(_policyEngine.GetAllGroups()));
+
+        app.MapPost("/api/groups", async (HttpRequest req) =>
+        {
+            try
+            {
+                DeviceGroup? group;
+                try
+                {
+                    group = await JsonSerializer.DeserializeAsync<DeviceGroup>(req.Body);
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogWarning(ex, "JSON invalid.");
+                    return Results.BadRequest("Invalid request body");
+                }
+                if (group == null) return Results.BadRequest("Invalid group JSON");
+                _policyEngine.SaveGroup(group);
+                return Results.Ok(new { saved = true });
+            }
+            catch (Exception ex) { return Results.BadRequest(ex.Message); }
+        });
+
+        app.MapPost("/api/blocklist/add", async (HttpRequest req) =>
+        {
+            try
+            {
+                var body = await new System.IO.StreamReader(req.Body).ReadToEndAsync();
+                Dictionary<string, string>? data;
+                try
+                {
+                    data = JsonSerializer.Deserialize<Dictionary<string, string>>(body);
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogWarning(ex, "JSON invalid.");
+                    return Results.BadRequest("Invalid request body");
+                }
+                if (data?.TryGetValue("domain", out string? domain) == true && !string.IsNullOrWhiteSpace(domain))
+                {
+                    _engine.AddToBlocklist(domain);
+                    return Results.Ok(new { added = domain });
+                }
+                return Results.BadRequest("domain required");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Request handler error.");
+                return Results.BadRequest("Invalid request");
+            }
+        });
+
+        app.MapPost("/api/allowlist/add", async (HttpRequest req) =>
+        {
+            try
+            {
+                var body = await new System.IO.StreamReader(req.Body).ReadToEndAsync();
+                Dictionary<string, string>? data;
+                try
+                {
+                    data = JsonSerializer.Deserialize<Dictionary<string, string>>(body);
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogWarning(ex, "JSON invalid.");
+                    return Results.BadRequest("Invalid request body");
+                }
+                if (data?.TryGetValue("domain", out string? domain) == true && !string.IsNullOrWhiteSpace(domain))
+                {
+                    AegisDNS.Core.Utilities.AllowlistManager.Add(domain);
+                    return Results.Ok(new { added = domain });
+                }
+                return Results.BadRequest("domain required");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Request handler error.");
+                return Results.BadRequest("Invalid request");
+            }
+        });
+
+        app.MapGet("/api/metrics/top-blocked", () =>
+            Results.Json(AegisDNS.Core.Utilities.TopDomainsTracker.GetTopBlocked(20)));
+
+        app.MapGet("/ws/live", async (HttpContext ctx) =>
+        {
+            if (!ctx.WebSockets.IsWebSocketRequest) { ctx.Response.StatusCode = 400; return; }
+            using var ws = await ctx.WebSockets.AcceptWebSocketAsync();
+            _liveClients.Add(ws);
+            var buf = new byte[1024];
+            while (ws.State == WebSocketState.Open)
+            {
+                var result = await ws.ReceiveAsync(new ArraySegment<byte>(buf), ctx.RequestAborted);
+                if (result.MessageType == WebSocketMessageType.Close) break;
+            }
+        });
+    }
+
+    private void OnLogReceived(string message)
+    {
+        if (_liveClients.IsEmpty) return;
+        var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+        {
+            ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            msg = message
+        }));
+        var segment = new ArraySegment<byte>(bytes);
+        foreach (var ws in _liveClients)
+            if (ws.State == WebSocketState.Open)
+                ws.SendAsync(segment, WebSocketMessageType.Text, true, CancellationToken.None)
+                  .ConfigureAwait(false);
+    }
+}
+</file>
+
+</files>
