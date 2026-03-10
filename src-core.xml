@@ -1,4 +1,4 @@
-This file is a merged representation of a subset of the codebase, containing specifically included files, combined into a single document by Repomix.
+This file is a merged representation of a subset of the codebase, containing specifically included files and files not matching ignore patterns, combined into a single document by Repomix.
 
 <file_summary>
 This section contains a summary of this file.
@@ -33,6 +33,7 @@ The content is organized as follows:
 - Some files may have been excluded based on .gitignore rules and Repomix's configuration
 - Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
 - Only files matching these patterns are included: src/AegisDNS.Core/**/*.cs
+- Files matching these patterns are excluded: obj/**, bin/**, *.user, *.suo, *.DotSettings, *.lock, node_modules/**
 - Files matching patterns in .gitignore are excluded
 - Files matching default ignore patterns are excluded
 - Files are sorted by Git change count (files with more changes are at the bottom)
@@ -143,718 +144,6 @@ src/
 
 <files>
 This section contains the contents of the repository's files.
-
-<file path="src/AegisDNS.Core/Utilities/BlocklistConfigManager.cs">
-using System;
-using System.IO;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
-namespace AegisDNS.Core;
-
-public class BlocklistSettings
-{
-    public bool EnableThreatIntelligence { get; set; } = true;
-    public bool EnableFakeBlocking { get; set; } = true;
-    public bool EnablePopUpAdsBlocking { get; set; } = true;
-    public bool EnableDynamicDnsBlocking { get; set; } = false;
-    public bool EnableNrdBlocking { get; set; } = false;
-    public bool EnableGamblingBlocking { get; set; } = false;
-    public bool EnableGamingLauncherBlocking { get; set; } = false;
-    public bool BlockMalwareDomains { get; set; } = true;
-    public bool BlockAdultContent { get; set; } = false;
-    public bool BlockTelemetry { get; set; } = true;
-}
-
-[JsonSerializable(typeof(BlocklistSettings))]
-internal partial class BlocklistConfigJsonContext : JsonSerializerContext { }
-
-public static class BlocklistConfigManager
-{
-    private static readonly string ConfigPath = Path.Combine(ConfigManager.AppFolder, "blocklist.config.json");
-    private static readonly string LegacyConfigPath = Path.Combine(ConfigManager.AppFolder, "user_config.json");
-
-    public static BlocklistSettings Settings { get; private set; } = new();
-
-    static BlocklistConfigManager() => Load();
-
-    public static void Load()
-    {
-        // One-time migration from legacy user_config.json
-        if (!File.Exists(ConfigPath) && File.Exists(LegacyConfigPath))
-        {
-            try
-            {
-                string legacyJson = File.ReadAllText(LegacyConfigPath);
-                var migrated = JsonSerializer.Deserialize(legacyJson, BlocklistConfigJsonContext.Default.BlocklistSettings);
-                if (migrated != null)
-                {
-                    Settings = migrated;
-                    Save();
-                    System.Diagnostics.Debug.WriteLine("✅ BlocklistConfigManager: migrated from legacy user_config.json");
-                    return;
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"⚠️ BlocklistConfigManager migration failed: {ex.Message}");
-            }
-        }
-
-        try
-        {
-            if (!File.Exists(ConfigPath)) { Save(); return; }
-            string json = File.ReadAllText(ConfigPath);
-            if (string.IsNullOrWhiteSpace(json)) { Settings = new(); return; }
-            try
-            {
-                var loaded = JsonSerializer.Deserialize(json, BlocklistConfigJsonContext.Default.BlocklistSettings);
-                if (loaded != null) Settings = loaded;
-            }
-            catch (JsonException ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"⚠️ blocklist.config.json invalid: {ex.Message}");
-                Settings = new();
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"⚠️ BlocklistConfigManager load failed: {ex.Message}");
-            Settings = new();
-        }
-    }
-
-    public static void Save()
-    {
-        try
-        {
-            if (!Directory.Exists(ConfigManager.AppFolder)) Directory.CreateDirectory(ConfigManager.AppFolder);
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            string json = JsonSerializer.Serialize(Settings, typeof(BlocklistSettings), new BlocklistConfigJsonContext(options));
-            File.WriteAllText(ConfigPath, json);
-            if (OperatingSystem.IsLinux())
-                File.SetUnixFileMode(ConfigPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"❌ BlocklistConfigManager save failed: {ex.Message}");
-        }
-    }
-}
-</file>
-
-<file path="src/AegisDNS.Core/Utilities/DnsConfigManager.cs">
-using System;
-using System.IO;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
-namespace AegisDNS.Core;
-
-public class DnsSettings
-{
-    public string PrimaryDns { get; set; } = "8.8.8.8";
-    public string SecondaryDns { get; set; } = "8.8.4.4";
-    public string PreferredAdapter { get; set; } = "Auto-Detect";
-    public UpstreamMode UpstreamMode { get; set; } = UpstreamMode.DoH;
-    public string DoTUpstream { get; set; } = "1.1.1.1";
-    public string DoHEndpointCloudflare { get; set; } = "https://cloudflare-dns.com/dns-query";
-    public string DoHEndpointGoogle { get; set; } = "https://dns.google/dns-query";
-    public bool EnableLatencyMonitor { get; set; } = true;
-    public int LatencyAlertThresholdMs { get; set; } = 200;
-    public string BlocklistUrl { get; set; } = "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts";
-    public string BlocklistAdultUrl { get; set; } = "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/fakenews-gambling-porn/hosts";
-    public string UpdateCheckUrl { get; set; } = "https://storage.googleapis.com/aegisdns-updates/manifest.json";
-}
-
-[JsonSerializable(typeof(DnsSettings))]
-internal partial class DnsConfigJsonContext : JsonSerializerContext { }
-
-public static class DnsConfigManager
-{
-    // Computed at call time so path always reflects ConfigManager.AppFolder,
-    // regardless of when this class is first touched relative to ConfigManager.
-    private static string ConfigPath => Path.Combine(ConfigManager.AppFolder, "dns.config.json");
-    private static string LegacyConfigPath => Path.Combine(ConfigManager.AppFolder, "user_config.json");
-
-    public static DnsSettings Settings { get; private set; } = new();
-
-    static DnsConfigManager()
-    {
-        Console.Error.WriteLine($"[AegisDNS] DnsConfigManager init → {ConfigPath}");
-        Load();
-    }
-
-    public static void Load()
-    {
-        // One-time migration from legacy user_config.json
-        if (!File.Exists(ConfigPath) && File.Exists(LegacyConfigPath))
-        {
-            try
-            {
-                string legacyJson = File.ReadAllText(LegacyConfigPath);
-                var migrated = JsonSerializer.Deserialize(legacyJson, DnsConfigJsonContext.Default.DnsSettings);
-                if (migrated != null)
-                {
-                    Settings = migrated;
-                    Save();
-                    System.Diagnostics.Debug.WriteLine("✅ DnsConfigManager: migrated from legacy user_config.json");
-                    return;
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"⚠️ DnsConfigManager migration failed: {ex.Message}");
-            }
-        }
-
-        try
-        {
-            if (!File.Exists(ConfigPath)) { Save(); return; }
-            string json = File.ReadAllText(ConfigPath);
-            if (string.IsNullOrWhiteSpace(json)) { Settings = new(); return; }
-            try
-            {
-                var loaded = JsonSerializer.Deserialize(json, DnsConfigJsonContext.Default.DnsSettings);
-                if (loaded != null) Settings = loaded;
-            }
-            catch (JsonException ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"⚠️ dns.config.json invalid: {ex.Message}");
-                Settings = new();
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"⚠️ DnsConfigManager load failed: {ex.Message}");
-            Settings = new();
-        }
-    }
-
-    public static void Save()
-    {
-        try
-        {
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            string json = JsonSerializer.Serialize(Settings, typeof(DnsSettings), new DnsConfigJsonContext(options));
-
-            using var fs = new FileStream(ConfigPath, FileMode.Create, FileAccess.Write, FileShare.None);
-            using var writer = new StreamWriter(fs);
-            writer.Write(json);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[AegisDNS] DnsConfigManager save failed: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
-        }
-    }
-}
-</file>
-
-<file path="src/AegisDNS.Core/Utilities/HttpsProxyConfigManager.cs">
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
-namespace AegisDNS.Core;
-
-public class HttpsProxySettings
-{
-    public bool EnableHttpsProxy { get; set; } = false;
-    public int ProxyPort { get; set; } = 8443;
-    public int MaxProxyConnections { get; set; } = 100;
-    public bool ProxyBlockYouTubeAds { get; set; } = true;
-    public bool ProxyBlockSpotifyAds { get; set; } = true;
-    public bool ProxyBlockPrimeVideoAds { get; set; } = true;
-    public bool ProxyBlockDisneyPlusAds { get; set; } = true;
-    public bool ProxyBlockGenericAds { get; set; } = true;
-    public List<string> ProxyBypassDomains { get; set; } = new()
-    {
-        "accounts.google.com",
-        "play.google.com",
-        "signal.org",
-        "*.signal.org",
-        "web.whatsapp.com"
-    };
-}
-
-[JsonSerializable(typeof(HttpsProxySettings))]
-[JsonSerializable(typeof(List<string>))]
-internal partial class HttpsProxyConfigJsonContext : JsonSerializerContext { }
-
-public static class HttpsProxyConfigManager
-{
-    private static readonly string ConfigPath = Path.Combine(ConfigManager.AppFolder, "https_proxy.config.json");
-    private static readonly string LegacyConfigPath = Path.Combine(ConfigManager.AppFolder, "user_config.json");
-
-    public static HttpsProxySettings Settings { get; private set; } = new();
-
-    public static event Action? SettingsChanged;
-
-    static HttpsProxyConfigManager() => Load();
-
-    public static void Load()
-    {
-        // One-time migration from legacy user_config.json
-        if (!File.Exists(ConfigPath) && File.Exists(LegacyConfigPath))
-        {
-            try
-            {
-                string legacyJson = File.ReadAllText(LegacyConfigPath);
-                var migrated = JsonSerializer.Deserialize(legacyJson, HttpsProxyConfigJsonContext.Default.HttpsProxySettings);
-                if (migrated != null)
-                {
-                    Settings = migrated;
-                    Save();
-                    System.Diagnostics.Debug.WriteLine("✅ HttpsProxyConfigManager: migrated from legacy user_config.json");
-                    return;
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"⚠️ HttpsProxyConfigManager migration failed: {ex.Message}");
-            }
-        }
-
-        try
-        {
-            if (!File.Exists(ConfigPath)) { Save(); return; }
-            string json = File.ReadAllText(ConfigPath);
-            if (string.IsNullOrWhiteSpace(json)) { Settings = new(); return; }
-            try
-            {
-                var loaded = JsonSerializer.Deserialize(json, HttpsProxyConfigJsonContext.Default.HttpsProxySettings);
-                if (loaded != null) Settings = loaded;
-            }
-            catch (JsonException ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"⚠️ https_proxy.config.json invalid: {ex.Message}");
-                Settings = new();
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"⚠️ HttpsProxyConfigManager load failed: {ex.Message}");
-            Settings = new();
-        }
-    }
-
-    public static void Save()
-    {
-        try
-        {
-            if (!Directory.Exists(ConfigManager.AppFolder)) Directory.CreateDirectory(ConfigManager.AppFolder);
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            string json = JsonSerializer.Serialize(Settings, typeof(HttpsProxySettings), new HttpsProxyConfigJsonContext(options));
-            File.WriteAllText(ConfigPath, json);
-            if (OperatingSystem.IsLinux())
-                File.SetUnixFileMode(ConfigPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-            SettingsChanged?.Invoke();
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"❌ HttpsProxyConfigManager save failed: {ex.Message}");
-        }
-    }
-}
-</file>
-
-<file path="src/AegisDNS.Core/Utilities/RouterConfigManager.cs">
-using System;
-using System.IO;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
-namespace AegisDNS.Core;
-
-public class RouterSettings
-{
-    public bool EnableRouterMode { get; set; } = false;
-    public string RouterModeBindAddress { get; set; } = "0.0.0.0";
-    public int RouterModePort { get; set; } = 53;
-    public bool EnablePerProcessBlocking { get; set; } = false;
-    public string ProcessRulesPath { get; set; } = "";
-    public bool EnableScheduledBlocking { get; set; } = false;
-    public string SchedulesPath { get; set; } = "";
-    public bool EnableExtensionApi { get; set; } = true;
-    public int ExtensionApiPort { get; set; } = 53421;
-}
-
-[JsonSerializable(typeof(RouterSettings))]
-internal partial class RouterConfigJsonContext : JsonSerializerContext { }
-
-public static class RouterConfigManager
-{
-    private static readonly string ConfigPath = Path.Combine(ConfigManager.AppFolder, "router.config.json");
-    private static readonly string LegacyConfigPath = Path.Combine(ConfigManager.AppFolder, "user_config.json");
-
-    public static RouterSettings Settings { get; private set; } = new();
-
-    static RouterConfigManager() => Load();
-
-    public static void Load()
-    {
-        // One-time migration from legacy user_config.json
-        if (!File.Exists(ConfigPath) && File.Exists(LegacyConfigPath))
-        {
-            try
-            {
-                string legacyJson = File.ReadAllText(LegacyConfigPath);
-                var migrated = JsonSerializer.Deserialize(legacyJson, RouterConfigJsonContext.Default.RouterSettings);
-                if (migrated != null)
-                {
-                    Settings = migrated;
-                    Save();
-                    System.Diagnostics.Debug.WriteLine("✅ RouterConfigManager: migrated from legacy user_config.json");
-                    return;
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"⚠️ RouterConfigManager migration failed: {ex.Message}");
-            }
-        }
-
-        try
-        {
-            if (!File.Exists(ConfigPath)) { Save(); return; }
-            string json = File.ReadAllText(ConfigPath);
-            if (string.IsNullOrWhiteSpace(json)) { Settings = new(); return; }
-            try
-            {
-                var loaded = JsonSerializer.Deserialize(json, RouterConfigJsonContext.Default.RouterSettings);
-                if (loaded != null) Settings = loaded;
-            }
-            catch (JsonException ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"⚠️ router.config.json invalid: {ex.Message}");
-                Settings = new();
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"⚠️ RouterConfigManager load failed: {ex.Message}");
-            Settings = new();
-        }
-    }
-
-    public static void Save()
-    {
-        try
-        {
-            if (!Directory.Exists(ConfigManager.AppFolder)) Directory.CreateDirectory(ConfigManager.AppFolder);
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            string json = JsonSerializer.Serialize(Settings, typeof(RouterSettings), new RouterConfigJsonContext(options));
-            File.WriteAllText(ConfigPath, json);
-            if (OperatingSystem.IsLinux())
-                File.SetUnixFileMode(ConfigPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"❌ RouterConfigManager save failed: {ex.Message}");
-        }
-    }
-}
-</file>
-
-<file path="src/AegisDNS.Core/Utilities/SecurityConfigManager.cs">
-using System;
-using System.IO;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
-namespace AegisDNS.Core;
-
-public class SecuritySettings
-{
-    public bool EnableAiAutoLearning { get; set; } = true;
-    public bool EnableAiCriticalAutoBlock { get; set; } = true;
-    public int AiLearningMinConfidence { get; set; } = 2;  // 0=Low, 1=Medium, 2=High, 3=Critical
-    public bool EnableWebDashboard { get; set; } = false;
-    public int WebDashboardPort { get; set; } = 8080;
-    public bool EnablePolicyEngine { get; set; } = false;
-    public bool CloudSyncEnabled { get; set; } = false;
-    public string CloudApiEndpoint { get; set; } = "https://api.aegisdns.com";
-    /// <summary>Stored encrypted via AesGcmTokenStore — this field holds the plaintext in-memory only.</summary>
-    public string DeviceApiToken { get; set; } = string.Empty;
-    public int CloudPolicyVersion { get; set; } = 0;
-    public string CloudDeviceId { get; set; } = string.Empty;
-    public int CloudSyncFailureCount { get; set; } = 0;
-}
-
-[JsonSerializable(typeof(SecuritySettings))]
-internal partial class SecurityConfigJsonContext : JsonSerializerContext { }
-
-public static class SecurityConfigManager
-{
-    // Computed at call time so path always reflects ConfigManager.AppFolder,
-    // regardless of when this class is first touched relative to ConfigManager.
-    private static string ConfigPath => Path.Combine(ConfigManager.AppFolder, "security.config.json");
-    private static string LegacyConfigPath => Path.Combine(ConfigManager.AppFolder, "user_config.json");
-
-    public static SecuritySettings Settings { get; private set; } = new();
-
-    static SecurityConfigManager()
-    {
-        Console.Error.WriteLine($"[AegisDNS] SecurityConfigManager init → {ConfigPath}");
-        Load();
-    }
-
-    public static void Load()
-    {
-        // One-time migration from legacy user_config.json
-        if (!File.Exists(ConfigPath) && File.Exists(LegacyConfigPath))
-        {
-            try
-            {
-                string legacyJson = File.ReadAllText(LegacyConfigPath);
-                var migrated = JsonSerializer.Deserialize(legacyJson, SecurityConfigJsonContext.Default.SecuritySettings);
-                if (migrated != null)
-                {
-                    Settings = migrated;
-                    Save();
-                    System.Diagnostics.Debug.WriteLine("✅ SecurityConfigManager: migrated from legacy user_config.json");
-                    return;
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"⚠️ SecurityConfigManager migration failed: {ex.Message}");
-            }
-        }
-
-        try
-        {
-            if (!File.Exists(ConfigPath)) { Save(); return; }
-            string json = File.ReadAllText(ConfigPath);
-            if (string.IsNullOrWhiteSpace(json)) { Settings = new(); return; }
-            try
-            {
-                var loaded = JsonSerializer.Deserialize(json, SecurityConfigJsonContext.Default.SecuritySettings);
-                if (loaded != null) Settings = loaded;
-            }
-            catch (JsonException ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"⚠️ security.config.json invalid: {ex.Message}");
-                Settings = new();
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"⚠️ SecurityConfigManager load failed: {ex.Message}");
-            Settings = new();
-        }
-    }
-
-    public static void Save()
-    {
-        try
-        {
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            string json = JsonSerializer.Serialize(Settings, typeof(SecuritySettings), new SecurityConfigJsonContext(options));
-
-            using var fs = new FileStream(ConfigPath, FileMode.Create, FileAccess.Write, FileShare.None);
-            using var writer = new StreamWriter(fs);
-            writer.Write(json);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[AegisDNS] SecurityConfigManager save failed: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
-        }
-    }
-}
-</file>
-
-<file path="src/AegisDNS.Core/Utilities/StreamingConfigManager.cs">
-using System;
-using System.IO;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
-namespace AegisDNS.Core;
-
-public class StreamingSettings
-{
-    public bool EnableStreamingAdBlock { get; set; } = false;
-    public bool BlockSpotifyAds { get; set; } = true;
-    public bool BlockTwitchAds { get; set; } = true;
-    public bool BlockHuluAds { get; set; } = true;
-    public bool BlockPeacockAds { get; set; } = true;
-    public bool BlockParamountAds { get; set; } = true;
-    public bool BlockYouTubeTracking { get; set; } = true;
-}
-
-[JsonSerializable(typeof(StreamingSettings))]
-internal partial class StreamingConfigJsonContext : JsonSerializerContext { }
-
-public static class StreamingConfigManager
-{
-    private static readonly string ConfigPath = Path.Combine(ConfigManager.AppFolder, "streaming.config.json");
-    private static readonly string LegacyConfigPath = Path.Combine(ConfigManager.AppFolder, "user_config.json");
-
-    public static StreamingSettings Settings { get; private set; } = new();
-
-    static StreamingConfigManager() => Load();
-
-    public static void Load()
-    {
-        // One-time migration from legacy user_config.json
-        if (!File.Exists(ConfigPath) && File.Exists(LegacyConfigPath))
-        {
-            try
-            {
-                string legacyJson = File.ReadAllText(LegacyConfigPath);
-                var migrated = JsonSerializer.Deserialize(legacyJson, StreamingConfigJsonContext.Default.StreamingSettings);
-                if (migrated != null)
-                {
-                    Settings = migrated;
-                    Save();
-                    System.Diagnostics.Debug.WriteLine("✅ StreamingConfigManager: migrated from legacy user_config.json");
-                    return;
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"⚠️ StreamingConfigManager migration failed: {ex.Message}");
-            }
-        }
-
-        try
-        {
-            if (!File.Exists(ConfigPath)) { Save(); return; }
-            string json = File.ReadAllText(ConfigPath);
-            if (string.IsNullOrWhiteSpace(json)) { Settings = new(); return; }
-            try
-            {
-                var loaded = JsonSerializer.Deserialize(json, StreamingConfigJsonContext.Default.StreamingSettings);
-                if (loaded != null) Settings = loaded;
-            }
-            catch (JsonException ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"⚠️ streaming.config.json invalid: {ex.Message}");
-                Settings = new();
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"⚠️ StreamingConfigManager load failed: {ex.Message}");
-            Settings = new();
-        }
-    }
-
-    public static void Save()
-    {
-        try
-        {
-            if (!Directory.Exists(ConfigManager.AppFolder)) Directory.CreateDirectory(ConfigManager.AppFolder);
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            string json = JsonSerializer.Serialize(Settings, typeof(StreamingSettings), new StreamingConfigJsonContext(options));
-            File.WriteAllText(ConfigPath, json);
-            if (OperatingSystem.IsLinux())
-                File.SetUnixFileMode(ConfigPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"❌ StreamingConfigManager save failed: {ex.Message}");
-        }
-    }
-}
-</file>
-
-<file path="src/AegisDNS.Core/Utilities/XdpConfigManager.cs">
-using System;
-using System.IO;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
-namespace AegisDNS.Core;
-
-public class XdpSettings
-{
-    public bool EnableEbpf { get; set; } = true;
-    public int XdpMode { get; set; } = 2;           // 0=Off, 1=Monitor, 2=Block
-    public string XdpInterface { get; set; } = "auto";
-    public bool XdpRfc1918Protection { get; set; } = true;
-    public bool XdpAlertOnDrop { get; set; } = true;
-}
-
-[JsonSerializable(typeof(XdpSettings))]
-internal partial class XdpConfigJsonContext : JsonSerializerContext { }
-
-public static class XdpConfigManager
-{
-    private static readonly string ConfigPath = Path.Combine(ConfigManager.AppFolder, "xdp.config.json");
-    private static readonly string LegacyConfigPath = Path.Combine(ConfigManager.AppFolder, "user_config.json");
-
-    public static XdpSettings Settings { get; private set; } = new();
-
-    static XdpConfigManager() => Load();
-
-    public static void Load()
-    {
-        // One-time migration from legacy user_config.json
-        if (!File.Exists(ConfigPath) && File.Exists(LegacyConfigPath))
-        {
-            try
-            {
-                string legacyJson = File.ReadAllText(LegacyConfigPath);
-                var migrated = JsonSerializer.Deserialize(legacyJson, XdpConfigJsonContext.Default.XdpSettings);
-                if (migrated != null)
-                {
-                    Settings = migrated;
-                    Save();
-                    System.Diagnostics.Debug.WriteLine("✅ XdpConfigManager: migrated from legacy user_config.json");
-                    return;
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"⚠️ XdpConfigManager migration failed: {ex.Message}");
-            }
-        }
-
-        try
-        {
-            if (!File.Exists(ConfigPath)) { Save(); return; }
-            string json = File.ReadAllText(ConfigPath);
-            if (string.IsNullOrWhiteSpace(json)) { Settings = new(); return; }
-            try
-            {
-                var loaded = JsonSerializer.Deserialize(json, XdpConfigJsonContext.Default.XdpSettings);
-                if (loaded != null) Settings = loaded;
-            }
-            catch (JsonException ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"⚠️ xdp.config.json invalid: {ex.Message}");
-                Settings = new();
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"⚠️ XdpConfigManager load failed: {ex.Message}");
-            Settings = new();
-        }
-    }
-
-    public static void Save()
-    {
-        try
-        {
-            if (!Directory.Exists(ConfigManager.AppFolder)) Directory.CreateDirectory(ConfigManager.AppFolder);
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            string json = JsonSerializer.Serialize(Settings, typeof(XdpSettings), new XdpConfigJsonContext(options));
-            File.WriteAllText(ConfigPath, json);
-            if (OperatingSystem.IsLinux())
-                File.SetUnixFileMode(ConfigPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"❌ XdpConfigManager save failed: {ex.Message}");
-        }
-    }
-}
-</file>
 
 <file path="src/AegisDNS.Core/Ai/Providers/AnthropicProvider.cs">
 using System.Net.Http.Headers;
@@ -2130,119 +1419,101 @@ public static class AdUrlPatterns
 }
 </file>
 
-<file path="src/AegisDNS.Core/Proxy/HttpsProxyHost.cs">
+<file path="src/AegisDNS.Core/Utilities/BlocklistConfigManager.cs">
 using System;
-using System.Buffers;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
-using System.Net;
-using System.Net.Security;
-using System.Net.Sockets;
-using System.Security.Authentication;
-using System.Security.Cryptography.X509Certificates;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
-using AegisDNS.Core.Security;
-using AegisDNS.Licensing;
+namespace AegisDNS.Core;
 
-namespace AegisDNS.Core.Proxy;
-
-/// <summary>
-/// Phase 18 — HTTPS Proxy Host.
-/// Listens for redirected HTTPS traffic and delegates to ProxyConnectionHandler.
-/// </summary>
-public class HttpsProxyHost
+public class BlocklistSettings
 {
-    private TcpListener? _listener;
-    private CancellationTokenSource? _cts;
-    private readonly int _port;
-    private readonly int _maxConnections;
-    private int _currentConnections;
+    public bool EnableThreatIntelligence { get; set; } = true;
+    public bool EnableFakeBlocking { get; set; } = true;
+    public bool EnablePopUpAdsBlocking { get; set; } = true;
+    public bool EnableDynamicDnsBlocking { get; set; } = false;
+    public bool EnableNrdBlocking { get; set; } = false;
+    public bool EnableGamblingBlocking { get; set; } = false;
+    public bool EnableGamingLauncherBlocking { get; set; } = false;
+    public bool BlockMalwareDomains { get; set; } = true;
+    public bool BlockAdultContent { get; set; } = false;
+    public bool BlockTelemetry { get; set; } = true;
+}
 
-    public int ActiveConnections => _currentConnections;
+[JsonSerializable(typeof(BlocklistSettings))]
+internal partial class BlocklistConfigJsonContext : JsonSerializerContext { }
 
-    public HttpsProxyHost(int port = 8443, int maxConnections = 100)
+public static class BlocklistConfigManager
+{
+    private static readonly string ConfigPath = Path.Combine(ConfigManager.AppFolder, "blocklist.config.json");
+    private static readonly string LegacyConfigPath = Path.Combine(ConfigManager.AppFolder, "user_config.json");
+
+    public static BlocklistSettings Settings { get; private set; } = new();
+
+    static BlocklistConfigManager() => Load();
+
+    public static void Load()
     {
-        _port = port;
-        _maxConnections = maxConnections;
-    }
-
-    public void Start()
-    {
-        if (_listener != null) return;
-
-        try
-        {
-            _listener = new TcpListener(IPAddress.Loopback, _port);
-            _listener.Start();
-            _cts = new CancellationTokenSource();
-
-            _ = AcceptLoopAsync(_cts.Token);
-
-            Debug.WriteLine($"[HttpsProxyHost] Listening on 127.0.0.1:{_port}");
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[HttpsProxyHost] Failed to start: {ex.Message}");
-            _listener = null;
-        }
-    }
-
-    public void Stop()
-    {
-        _cts?.Cancel();
-        _listener?.Stop();
-        _listener = null;
-        Debug.WriteLine("[HttpsProxyHost] Stopped.");
-    }
-
-    private async Task AcceptLoopAsync(CancellationToken ct)
-    {
-        while (!ct.IsCancellationRequested)
+        // One-time migration from legacy user_config.json
+        if (!File.Exists(ConfigPath) && File.Exists(LegacyConfigPath))
         {
             try
             {
-                var client = await _listener!.AcceptTcpClientAsync(ct);
-
-                if (_currentConnections >= _maxConnections)
+                string legacyJson = File.ReadAllText(LegacyConfigPath);
+                try
                 {
-                    client.Close();
-                    continue;
+                    var migrated = JsonSerializer.Deserialize(legacyJson, BlocklistConfigJsonContext.Default.BlocklistSettings);
+                    if (migrated != null) { Settings = migrated; Save(); return; }
                 }
-
-                _ = HandleConnectionAsync(client, ct);
+                catch (JsonException ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"⚠️ [BlocklistConfigManager] migration JSON invalid: {ex.Message}");
+                }
             }
-            catch (OperationCanceledException) { break; }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[HttpsProxyHost] Accept error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"⚠️ BlocklistConfigManager migration failed: {ex.Message}");
             }
         }
-    }
-
-    private async Task HandleConnectionAsync(TcpClient client, CancellationToken ct)
-    {
-        Interlocked.Increment(ref _currentConnections);
-        MetricsManager.IncrementProxyRequests(); // Assuming this will be added in 18.9
 
         try
         {
-            using (client)
+            if (!File.Exists(ConfigPath)) { Save(); return; }
+            string json = File.ReadAllText(ConfigPath);
+            if (string.IsNullOrWhiteSpace(json)) { Settings = new(); return; }
+            try
             {
-                var handler = new ProxyConnectionHandler(client);
-                await handler.ProcessAsync(ct);
+                var loaded = JsonSerializer.Deserialize(json, BlocklistConfigJsonContext.Default.BlocklistSettings);
+                if (loaded != null) Settings = loaded;
+            }
+            catch (JsonException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"⚠️ blocklist.config.json invalid: {ex.Message}");
+                Settings = new();
             }
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[HttpsProxyHost] Connection error: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"⚠️ BlocklistConfigManager load failed: {ex.Message}");
+            Settings = new();
         }
-        finally
+    }
+
+    public static void Save()
+    {
+        try
         {
-            Interlocked.Decrement(ref _currentConnections);
+            if (!Directory.Exists(ConfigManager.AppFolder)) Directory.CreateDirectory(ConfigManager.AppFolder);
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string json = JsonSerializer.Serialize(Settings, typeof(BlocklistSettings), new BlocklistConfigJsonContext(options));
+            File.WriteAllText(ConfigPath, json);
+            if (OperatingSystem.IsLinux())
+                File.SetUnixFileMode(ConfigPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ BlocklistConfigManager save failed: {ex.Message}");
         }
     }
 }
@@ -2315,6 +1586,433 @@ Comment=AegisDNS DNS Privacy Shield — auto-start
 }
 </file>
 
+<file path="src/AegisDNS.Core/Utilities/DnsConfigManager.cs">
+using System;
+using System.IO;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace AegisDNS.Core;
+
+public class DnsSettings
+{
+    public string PrimaryDns { get; set; } = "8.8.8.8";
+    public string SecondaryDns { get; set; } = "8.8.4.4";
+    public string PreferredAdapter { get; set; } = "Auto-Detect";
+    public UpstreamMode UpstreamMode { get; set; } = UpstreamMode.DoH;
+    public string DoTUpstream { get; set; } = "1.1.1.1";
+    public string DoHEndpointCloudflare { get; set; } = "https://cloudflare-dns.com/dns-query";
+    public string DoHEndpointGoogle { get; set; } = "https://dns.google/dns-query";
+    public bool EnableLatencyMonitor { get; set; } = true;
+    public int LatencyAlertThresholdMs { get; set; } = 200;
+    public string BlocklistUrl { get; set; } = "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts";
+    public string BlocklistAdultUrl { get; set; } = "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/fakenews-gambling-porn/hosts";
+    public string UpdateCheckUrl { get; set; } = "https://storage.googleapis.com/aegisdns-updates/manifest.json";
+}
+
+[JsonSerializable(typeof(DnsSettings))]
+internal partial class DnsConfigJsonContext : JsonSerializerContext { }
+
+public static class DnsConfigManager
+{
+    // Computed at call time so path always reflects ConfigManager.AppFolder,
+    // regardless of when this class is first touched relative to ConfigManager.
+    private static string ConfigPath => Path.Combine(ConfigManager.AppFolder, "dns.config.json");
+    private static string LegacyConfigPath => Path.Combine(ConfigManager.AppFolder, "user_config.json");
+
+    public static DnsSettings Settings { get; private set; } = new();
+
+    static DnsConfigManager()
+    {
+        Console.Error.WriteLine($"[AegisDNS] DnsConfigManager init → {ConfigPath}");
+        Load();
+    }
+
+    public static void Load()
+    {
+        // One-time migration from legacy user_config.json
+        if (!File.Exists(ConfigPath) && File.Exists(LegacyConfigPath))
+        {
+            try
+            {
+                string legacyJson = File.ReadAllText(LegacyConfigPath);
+                try
+                {
+                    var migrated = JsonSerializer.Deserialize(legacyJson, DnsConfigJsonContext.Default.DnsSettings);
+                    if (migrated != null) { Settings = migrated; Save(); return; }
+                }
+                catch (JsonException ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"⚠️ [DnsConfigManager] migration JSON invalid: {ex.Message}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"⚠️ DnsConfigManager migration failed: {ex.Message}");
+            }
+        }
+
+        try
+        {
+            if (!File.Exists(ConfigPath)) { Save(); return; }
+            string json = File.ReadAllText(ConfigPath);
+            if (string.IsNullOrWhiteSpace(json)) { Settings = new(); return; }
+            try
+            {
+                var loaded = JsonSerializer.Deserialize(json, DnsConfigJsonContext.Default.DnsSettings);
+                if (loaded != null) Settings = loaded;
+            }
+            catch (JsonException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"⚠️ dns.config.json invalid: {ex.Message}");
+                Settings = new();
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"⚠️ DnsConfigManager load failed: {ex.Message}");
+            Settings = new();
+        }
+    }
+
+    public static void Save()
+    {
+        try
+        {
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string json = JsonSerializer.Serialize(Settings, typeof(DnsSettings), new DnsConfigJsonContext(options));
+
+            using var fs = new FileStream(ConfigPath, FileMode.Create, FileAccess.Write, FileShare.None);
+            using var writer = new StreamWriter(fs);
+            writer.Write(json);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[AegisDNS] DnsConfigManager save failed: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
+        }
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Core/Utilities/HttpsProxyConfigManager.cs">
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace AegisDNS.Core;
+
+public class HttpsProxySettings
+{
+    public bool EnableHttpsProxy { get; set; } = false;
+    public int ProxyPort { get; set; } = 8443;
+    public int MaxProxyConnections { get; set; } = 100;
+    public bool ProxyBlockYouTubeAds { get; set; } = true;
+    public bool ProxyBlockSpotifyAds { get; set; } = true;
+    public bool ProxyBlockPrimeVideoAds { get; set; } = true;
+    public bool ProxyBlockDisneyPlusAds { get; set; } = true;
+    public bool ProxyBlockGenericAds { get; set; } = true;
+    public List<string> ProxyBypassDomains { get; set; } = new()
+    {
+        "accounts.google.com",
+        "play.google.com",
+        "signal.org",
+        "*.signal.org",
+        "web.whatsapp.com"
+    };
+}
+
+[JsonSerializable(typeof(HttpsProxySettings))]
+[JsonSerializable(typeof(List<string>))]
+internal partial class HttpsProxyConfigJsonContext : JsonSerializerContext { }
+
+public static class HttpsProxyConfigManager
+{
+    private static readonly string ConfigPath = Path.Combine(ConfigManager.AppFolder, "https_proxy.config.json");
+    private static readonly string LegacyConfigPath = Path.Combine(ConfigManager.AppFolder, "user_config.json");
+
+    public static HttpsProxySettings Settings { get; private set; } = new();
+
+    public static event Action? SettingsChanged;
+
+    static HttpsProxyConfigManager() => Load();
+
+    public static void Load()
+    {
+        // One-time migration from legacy user_config.json
+        if (!File.Exists(ConfigPath) && File.Exists(LegacyConfigPath))
+        {
+            try
+            {
+                string legacyJson = File.ReadAllText(LegacyConfigPath);
+                try
+                {
+                    var migrated = JsonSerializer.Deserialize(legacyJson, HttpsProxyConfigJsonContext.Default.HttpsProxySettings);
+                    if (migrated != null) { Settings = migrated; Save(); return; }
+                }
+                catch (JsonException ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"⚠️ [HttpsProxyConfigManager] migration JSON invalid: {ex.Message}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"⚠️ HttpsProxyConfigManager migration failed: {ex.Message}");
+            }
+        }
+
+        try
+        {
+            if (!File.Exists(ConfigPath)) { Save(); return; }
+            string json = File.ReadAllText(ConfigPath);
+            if (string.IsNullOrWhiteSpace(json)) { Settings = new(); return; }
+            try
+            {
+                var loaded = JsonSerializer.Deserialize(json, HttpsProxyConfigJsonContext.Default.HttpsProxySettings);
+                if (loaded != null) Settings = loaded;
+            }
+            catch (JsonException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"⚠️ https_proxy.config.json invalid: {ex.Message}");
+                Settings = new();
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"⚠️ HttpsProxyConfigManager load failed: {ex.Message}");
+            Settings = new();
+        }
+    }
+
+    public static void Save()
+    {
+        try
+        {
+            if (!Directory.Exists(ConfigManager.AppFolder)) Directory.CreateDirectory(ConfigManager.AppFolder);
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string json = JsonSerializer.Serialize(Settings, typeof(HttpsProxySettings), new HttpsProxyConfigJsonContext(options));
+            File.WriteAllText(ConfigPath, json);
+            if (OperatingSystem.IsLinux())
+                File.SetUnixFileMode(ConfigPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            SettingsChanged?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ HttpsProxyConfigManager save failed: {ex.Message}");
+        }
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Core/Utilities/RouterConfigManager.cs">
+using System;
+using System.IO;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace AegisDNS.Core;
+
+public class RouterSettings
+{
+    public bool EnableRouterMode { get; set; } = false;
+    public string RouterModeBindAddress { get; set; } = "0.0.0.0";
+    public int RouterModePort { get; set; } = 53;
+    public bool EnablePerProcessBlocking { get; set; } = false;
+    public string ProcessRulesPath { get; set; } = "";
+    public bool EnableScheduledBlocking { get; set; } = false;
+    public string SchedulesPath { get; set; } = "";
+    public bool EnableExtensionApi { get; set; } = true;
+    public int ExtensionApiPort { get; set; } = 53421;
+}
+
+[JsonSerializable(typeof(RouterSettings))]
+internal partial class RouterConfigJsonContext : JsonSerializerContext { }
+
+public static class RouterConfigManager
+{
+    private static readonly string ConfigPath = Path.Combine(ConfigManager.AppFolder, "router.config.json");
+    private static readonly string LegacyConfigPath = Path.Combine(ConfigManager.AppFolder, "user_config.json");
+
+    public static RouterSettings Settings { get; private set; } = new();
+
+    static RouterConfigManager() => Load();
+
+    public static void Load()
+    {
+        // One-time migration from legacy user_config.json
+        if (!File.Exists(ConfigPath) && File.Exists(LegacyConfigPath))
+        {
+            try
+            {
+                string legacyJson = File.ReadAllText(LegacyConfigPath);
+                try
+                {
+                    var migrated = JsonSerializer.Deserialize(legacyJson, RouterConfigJsonContext.Default.RouterSettings);
+                    if (migrated != null) { Settings = migrated; Save(); return; }
+                }
+                catch (JsonException ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"⚠️ [RouterConfigManager] migration JSON invalid: {ex.Message}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"⚠️ RouterConfigManager migration failed: {ex.Message}");
+            }
+        }
+
+        try
+        {
+            if (!File.Exists(ConfigPath)) { Save(); return; }
+            string json = File.ReadAllText(ConfigPath);
+            if (string.IsNullOrWhiteSpace(json)) { Settings = new(); return; }
+            try
+            {
+                var loaded = JsonSerializer.Deserialize(json, RouterConfigJsonContext.Default.RouterSettings);
+                if (loaded != null) Settings = loaded;
+            }
+            catch (JsonException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"⚠️ router.config.json invalid: {ex.Message}");
+                Settings = new();
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"⚠️ RouterConfigManager load failed: {ex.Message}");
+            Settings = new();
+        }
+    }
+
+    public static void Save()
+    {
+        try
+        {
+            if (!Directory.Exists(ConfigManager.AppFolder)) Directory.CreateDirectory(ConfigManager.AppFolder);
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string json = JsonSerializer.Serialize(Settings, typeof(RouterSettings), new RouterConfigJsonContext(options));
+            File.WriteAllText(ConfigPath, json);
+            if (OperatingSystem.IsLinux())
+                File.SetUnixFileMode(ConfigPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ RouterConfigManager save failed: {ex.Message}");
+        }
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Core/Utilities/SecurityConfigManager.cs">
+using System;
+using System.IO;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace AegisDNS.Core;
+
+public class SecuritySettings
+{
+    public bool EnableAiAutoLearning { get; set; } = true;
+    public bool EnableAiCriticalAutoBlock { get; set; } = true;
+    public int AiLearningMinConfidence { get; set; } = 2;  // 0=Low, 1=Medium, 2=High, 3=Critical
+    public bool EnableWebDashboard { get; set; } = false;
+    public int WebDashboardPort { get; set; } = 8080;
+    public bool EnablePolicyEngine { get; set; } = false;
+    public bool CloudSyncEnabled { get; set; } = false;
+    public string CloudApiEndpoint { get; set; } = "https://api.aegisdns.com";
+    /// <summary>Stored encrypted via AesGcmTokenStore — this field holds the plaintext in-memory only.</summary>
+    public string DeviceApiToken { get; set; } = string.Empty;
+    public int CloudPolicyVersion { get; set; } = 0;
+    public string CloudDeviceId { get; set; } = string.Empty;
+    public int CloudSyncFailureCount { get; set; } = 0;
+}
+
+[JsonSerializable(typeof(SecuritySettings))]
+internal partial class SecurityConfigJsonContext : JsonSerializerContext { }
+
+public static class SecurityConfigManager
+{
+    // Computed at call time so path always reflects ConfigManager.AppFolder,
+    // regardless of when this class is first touched relative to ConfigManager.
+    private static string ConfigPath => Path.Combine(ConfigManager.AppFolder, "security.config.json");
+    private static string LegacyConfigPath => Path.Combine(ConfigManager.AppFolder, "user_config.json");
+
+    public static SecuritySettings Settings { get; private set; } = new();
+
+    static SecurityConfigManager()
+    {
+        Console.Error.WriteLine($"[AegisDNS] SecurityConfigManager init → {ConfigPath}");
+        Load();
+    }
+
+    public static void Load()
+    {
+        // One-time migration from legacy user_config.json
+        if (!File.Exists(ConfigPath) && File.Exists(LegacyConfigPath))
+        {
+            try
+            {
+                string legacyJson = File.ReadAllText(LegacyConfigPath);
+                try
+                {
+                    var migrated = JsonSerializer.Deserialize(legacyJson, SecurityConfigJsonContext.Default.SecuritySettings);
+                    if (migrated != null) { Settings = migrated; Save(); return; }
+                }
+                catch (JsonException ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"⚠️ [SecurityConfigManager] migration JSON invalid: {ex.Message}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"⚠️ SecurityConfigManager migration failed: {ex.Message}");
+            }
+        }
+
+        try
+        {
+            if (!File.Exists(ConfigPath)) { Save(); return; }
+            string json = File.ReadAllText(ConfigPath);
+            if (string.IsNullOrWhiteSpace(json)) { Settings = new(); return; }
+            try
+            {
+                var loaded = JsonSerializer.Deserialize(json, SecurityConfigJsonContext.Default.SecuritySettings);
+                if (loaded != null) Settings = loaded;
+            }
+            catch (JsonException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"⚠️ security.config.json invalid: {ex.Message}");
+                Settings = new();
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"⚠️ SecurityConfigManager load failed: {ex.Message}");
+            Settings = new();
+        }
+    }
+
+    public static void Save()
+    {
+        try
+        {
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string json = JsonSerializer.Serialize(Settings, typeof(SecuritySettings), new SecurityConfigJsonContext(options));
+
+            using var fs = new FileStream(ConfigPath, FileMode.Create, FileAccess.Write, FileShare.None);
+            using var writer = new StreamWriter(fs);
+            writer.Write(json);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[AegisDNS] SecurityConfigManager save failed: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
+        }
+    }
+}
+</file>
+
 <file path="src/AegisDNS.Core/Utilities/SharedHttpClient.cs">
 using System;
 using System.Net;
@@ -2346,6 +2044,103 @@ internal static class SharedHttpClient
     });
 
     public static HttpClient Instance => _lazyClient.Value;
+}
+</file>
+
+<file path="src/AegisDNS.Core/Utilities/StreamingConfigManager.cs">
+using System;
+using System.IO;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace AegisDNS.Core;
+
+public class StreamingSettings
+{
+    public bool EnableStreamingAdBlock { get; set; } = false;
+    public bool BlockSpotifyAds { get; set; } = true;
+    public bool BlockTwitchAds { get; set; } = true;
+    public bool BlockHuluAds { get; set; } = true;
+    public bool BlockPeacockAds { get; set; } = true;
+    public bool BlockParamountAds { get; set; } = true;
+    public bool BlockYouTubeTracking { get; set; } = true;
+}
+
+[JsonSerializable(typeof(StreamingSettings))]
+internal partial class StreamingConfigJsonContext : JsonSerializerContext { }
+
+public static class StreamingConfigManager
+{
+    private static readonly string ConfigPath = Path.Combine(ConfigManager.AppFolder, "streaming.config.json");
+    private static readonly string LegacyConfigPath = Path.Combine(ConfigManager.AppFolder, "user_config.json");
+
+    public static StreamingSettings Settings { get; private set; } = new();
+
+    static StreamingConfigManager() => Load();
+
+    public static void Load()
+    {
+        // One-time migration from legacy user_config.json
+        if (!File.Exists(ConfigPath) && File.Exists(LegacyConfigPath))
+        {
+            try
+            {
+                string legacyJson = File.ReadAllText(LegacyConfigPath);
+                try
+                {
+                    var migrated = JsonSerializer.Deserialize(legacyJson, StreamingConfigJsonContext.Default.StreamingSettings);
+                    if (migrated != null) { Settings = migrated; Save(); return; }
+                }
+                catch (JsonException ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"⚠️ [StreamingConfigManager] migration JSON invalid: {ex.Message}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"⚠️ StreamingConfigManager migration failed: {ex.Message}");
+            }
+        }
+
+        try
+        {
+            if (!File.Exists(ConfigPath)) { Save(); return; }
+            string json = File.ReadAllText(ConfigPath);
+            if (string.IsNullOrWhiteSpace(json)) { Settings = new(); return; }
+            try
+            {
+                var loaded = JsonSerializer.Deserialize(json, StreamingConfigJsonContext.Default.StreamingSettings);
+                if (loaded != null) Settings = loaded;
+            }
+            catch (JsonException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"⚠️ streaming.config.json invalid: {ex.Message}");
+                Settings = new();
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"⚠️ StreamingConfigManager load failed: {ex.Message}");
+            Settings = new();
+        }
+    }
+
+    public static void Save()
+    {
+        try
+        {
+            if (!Directory.Exists(ConfigManager.AppFolder)) Directory.CreateDirectory(ConfigManager.AppFolder);
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string json = JsonSerializer.Serialize(Settings, typeof(StreamingSettings), new StreamingConfigJsonContext(options));
+            File.WriteAllText(ConfigPath, json);
+            if (OperatingSystem.IsLinux())
+                File.SetUnixFileMode(ConfigPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ StreamingConfigManager save failed: {ex.Message}");
+        }
+    }
 }
 </file>
 
@@ -2420,6 +2215,101 @@ public static class TelemetryBlocker
         catch (Exception ex)
         {
             Debug.WriteLine($"[TelemetryBlocker] Error: {ex.Message}");
+        }
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Core/Utilities/XdpConfigManager.cs">
+using System;
+using System.IO;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace AegisDNS.Core;
+
+public class XdpSettings
+{
+    public bool EnableEbpf { get; set; } = true;
+    public int XdpMode { get; set; } = 2;           // 0=Off, 1=Monitor, 2=Block
+    public string XdpInterface { get; set; } = "auto";
+    public bool XdpRfc1918Protection { get; set; } = true;
+    public bool XdpAlertOnDrop { get; set; } = true;
+}
+
+[JsonSerializable(typeof(XdpSettings))]
+internal partial class XdpConfigJsonContext : JsonSerializerContext { }
+
+public static class XdpConfigManager
+{
+    private static readonly string ConfigPath = Path.Combine(ConfigManager.AppFolder, "xdp.config.json");
+    private static readonly string LegacyConfigPath = Path.Combine(ConfigManager.AppFolder, "user_config.json");
+
+    public static XdpSettings Settings { get; private set; } = new();
+
+    static XdpConfigManager() => Load();
+
+    public static void Load()
+    {
+        // One-time migration from legacy user_config.json
+        if (!File.Exists(ConfigPath) && File.Exists(LegacyConfigPath))
+        {
+            try
+            {
+                string legacyJson = File.ReadAllText(LegacyConfigPath);
+                try
+                {
+                    var migrated = JsonSerializer.Deserialize(legacyJson, XdpConfigJsonContext.Default.XdpSettings);
+                    if (migrated != null) { Settings = migrated; Save(); return; }
+                }
+                catch (JsonException ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"⚠️ [XdpConfigManager] migration JSON invalid: {ex.Message}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"⚠️ XdpConfigManager migration failed: {ex.Message}");
+            }
+        }
+
+        try
+        {
+            if (!File.Exists(ConfigPath)) { Save(); return; }
+            string json = File.ReadAllText(ConfigPath);
+            if (string.IsNullOrWhiteSpace(json)) { Settings = new(); return; }
+            try
+            {
+                var loaded = JsonSerializer.Deserialize(json, XdpConfigJsonContext.Default.XdpSettings);
+                if (loaded != null) Settings = loaded;
+            }
+            catch (JsonException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"⚠️ xdp.config.json invalid: {ex.Message}");
+                Settings = new();
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"⚠️ XdpConfigManager load failed: {ex.Message}");
+            Settings = new();
+        }
+    }
+
+    public static void Save()
+    {
+        try
+        {
+            if (!Directory.Exists(ConfigManager.AppFolder)) Directory.CreateDirectory(ConfigManager.AppFolder);
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string json = JsonSerializer.Serialize(Settings, typeof(XdpSettings), new XdpConfigJsonContext(options));
+            File.WriteAllText(ConfigPath, json);
+            if (OperatingSystem.IsLinux())
+                File.SetUnixFileMode(ConfigPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ XdpConfigManager save failed: {ex.Message}");
         }
     }
 }
@@ -2677,58 +2567,6 @@ qwIDAQAB
 }
 </file>
 
-<file path="src/AegisDNS.Core/Core/StreamingBlockEngine.cs">
-using AegisDNS.Core.Utilities;
-using AegisDNS.Licensing;
-
-namespace AegisDNS.Core;
-
-/// <summary>
-/// Evaluates DNS queries against streaming platform ad/tracking blocklists.
-/// All checks are synchronous O(1) ImmutableHashSet lookups — no hot-path overhead.
-/// Gated on Pro+ license tier. Phase 17 — DNS Streaming Ad Blocker.
-/// </summary>
-public static class StreamingBlockEngine
-{
-    /// <summary>
-    /// Returns true if the given domain (or any of its parent domains) is in an enabled
-    /// streaming platform blocklist. Returns false immediately for free-tier users.
-    /// Subdomain matching: "foo.ads.spotify.com" matches because "ads.spotify.com" is listed.
-    /// </summary>
-    public static bool IsStreamingAdDomain(string domain)
-    {
-        if (LicenseManager.CurrentTier < LicenseManager.LicenseTier.Pro)
-            return false;
-
-        var settings = StreamingConfigManager.Settings;
-        if (!settings.EnableStreamingAdBlock)
-            return false;
-
-        // Build candidate list: the domain itself plus all parent-label suffixes.
-        // E.g. "foo.ads.spotify.com" → ["foo.ads.spotify.com", "ads.spotify.com", "spotify.com"]
-        // This gives subdomain matching without any string allocation loop in the common case.
-        ReadOnlySpan<char> remaining = domain.AsSpan();
-        while (true)
-        {
-            string candidate = remaining.ToString();
-
-            if (settings.BlockSpotifyAds && StreamingBlocklists.SpotifyAds.Contains(candidate)) return true;
-            if (settings.BlockTwitchAds && StreamingBlocklists.TwitchAds.Contains(candidate)) return true;
-            if (settings.BlockHuluAds && StreamingBlocklists.HuluAds.Contains(candidate)) return true;
-            if (settings.BlockPeacockAds && StreamingBlocklists.PeacockAds.Contains(candidate)) return true;
-            if (settings.BlockParamountAds && StreamingBlocklists.ParamountAds.Contains(candidate)) return true;
-            if (settings.BlockYouTubeTracking && StreamingBlocklists.YouTubeTracking.Contains(candidate)) return true;
-
-            int dot = remaining.IndexOf('.');
-            if (dot < 0) break;
-            remaining = remaining[(dot + 1)..];
-        }
-
-        return false;
-    }
-}
-</file>
-
 <file path="src/AegisDNS.Core/Dns/IUpstreamResolver.cs">
 using ARSoft.Tools.Net;
 using ARSoft.Tools.Net.Dns;
@@ -2853,158 +2691,6 @@ public class DomainRoleRecord
     {
         return MonetizationScore > MONETIZATION_BLOCK_THRESHOLD &&
                FunctionalScore < FUNCTIONAL_SAFE_LIMIT;
-    }
-}
-</file>
-
-<file path="src/AegisDNS.Core/Monitoring/LatencyMonitor.cs">
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Net;
-using System.Threading;
-using System.Threading.Tasks;
-
-using ARSoft.Tools.Net;
-using ARSoft.Tools.Net.Dns;
-
-namespace AegisDNS.Core.Monitoring;
-
-/// <summary>
-/// Pings the configured upstream DNS server every 30 seconds using a real DNS query.
-/// Records a rolling average of the last 5 samples and publishes to MetricsManager.
-/// Non-fatal: failures set latency to -1 (displayed as "—").
-/// </summary>
-public sealed class LatencyMonitor
-{
-    private static readonly string[] PresetUpstreams = ["1.1.1.1", "8.8.8.8", "9.9.9.9"];
-    private const int PingIntervalSeconds = 30;
-    private const int RollingWindowSize = 5;
-
-    private readonly AegisEngine _engine;
-    private readonly Queue<long> _samples = new();
-    private CancellationTokenSource? _cts;
-
-    public LatencyMonitor(AegisEngine engine)
-    {
-        _engine = engine;
-    }
-
-    public void Start()
-    {
-        _cts = new CancellationTokenSource();
-        _ = Task.Run(() => RunLoop(_cts.Token), _cts.Token);
-    }
-
-    public void Stop()
-    {
-        _cts?.Cancel();
-    }
-
-    private async Task RunLoop(CancellationToken token)
-    {
-        while (!token.IsCancellationRequested)
-        {
-            try
-            {
-                await Task.Delay(TimeSpan.FromSeconds(PingIntervalSeconds), token).ConfigureAwait(false);
-                PingCurrentUpstream();
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-            catch { }
-        }
-    }
-
-    private void PingCurrentUpstream()
-    {
-        try
-        {
-            string upstream = DnsConfigManager.Settings.PrimaryDns;
-            if (!IPAddress.TryParse(upstream, out var upstreamIp)) return;
-
-            var sw = Stopwatch.StartNew();
-            var client = new DnsClient(new List<IPAddress> { upstreamIp }, 5000);
-            var result = client.Resolve(DomainName.Parse("example.com"), RecordType.A, RecordClass.INet);
-            sw.Stop();
-
-            long latencyMs = result != null ? sw.ElapsedMilliseconds : -1;
-            UpdateSamples(latencyMs);
-
-            int thresholdMs = DnsConfigManager.Settings.LatencyAlertThresholdMs;
-
-            if (latencyMs >= 0 && latencyMs > thresholdMs)
-            {
-                if (!MetricsManager.Current.LatencyWarning)
-                {
-                    MetricsManager.SetLatencyWarning(true);
-                    _engine.Broadcast($"⚠️ DNS latency warning: {latencyMs}ms exceeds threshold of {thresholdMs}ms");
-                }
-            }
-            else if (latencyMs >= 0)
-            {
-                MetricsManager.SetLatencyWarning(false);
-            }
-        }
-        catch { }
-    }
-
-    private void UpdateSamples(long latencyMs)
-    {
-        lock (_samples)
-        {
-            if (latencyMs >= 0)
-            {
-                _samples.Enqueue(latencyMs);
-                while (_samples.Count > RollingWindowSize)
-                    _samples.Dequeue();
-
-                long sum = 0;
-                foreach (var s in _samples) sum += s;
-                int avg = (int)(sum / _samples.Count);
-                MetricsManager.SetUpstreamLatency(avg);
-            }
-            else
-            {
-                MetricsManager.SetUpstreamLatency(-1);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Sends one test query to each preset upstream and returns a list sorted by latency.
-    /// Exposed for future "pick fastest upstream" feature.
-    /// </summary>
-    public IReadOnlyList<(string Upstream, long LatencyMs)> CompareUpstreams()
-    {
-        var results = new List<(string Upstream, long LatencyMs)>();
-        foreach (var upstream in PresetUpstreams)
-        {
-            try
-            {
-                if (!IPAddress.TryParse(upstream, out var ip)) continue;
-                var sw = Stopwatch.StartNew();
-                var client = new DnsClient(new List<IPAddress> { ip }, 5000);
-                var result = client.Resolve(DomainName.Parse("example.com"), RecordType.A, RecordClass.INet);
-                sw.Stop();
-                results.Add((upstream, result != null ? sw.ElapsedMilliseconds : -1L));
-            }
-            catch
-            {
-                results.Add((upstream, -1L));
-            }
-        }
-
-        results.Sort((a, b) =>
-        {
-            if (a.LatencyMs < 0) return 1;
-            if (b.LatencyMs < 0) return -1;
-            return a.LatencyMs.CompareTo(b.LatencyMs);
-        });
-
-        return results.AsReadOnly();
     }
 }
 </file>
@@ -3140,149 +2826,7 @@ public class ProcessDnsRule
 }
 </file>
 
-<file path="src/AegisDNS.Core/Proxy/AdBlockingMiddleware.cs">
-using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Text.Json;
-
-namespace AegisDNS.Core.Proxy;
-
-/// <summary>
-/// Phase 18 — Ad Blocking Middleware.
-/// Decides whether an HTTPS request should be blocked based on URL patterns.
-/// </summary>
-public static class AdBlockingMiddleware
-{
-    private static readonly string UserPatternsPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".config", "aegisdns", "proxy_patterns.json");
-
-    private static ImmutableList<AdPattern> _activePatterns = ImmutableList<AdPattern>.Empty;
-
-    static AdBlockingMiddleware()
-    {
-        ReloadPatterns();
-        HttpsProxyConfigManager.SettingsChanged += ReloadPatterns;
-    }
-
-    public static void ReloadPatterns()
-    {
-        var builder = ImmutableList.CreateBuilder<AdPattern>();
-
-        // Add defaults based on settings
-        if (HttpsProxyConfigManager.Settings.ProxyBlockYouTubeAds)
-            builder.AddRange(AdUrlPatterns.YouTubePatterns);
-
-        if (HttpsProxyConfigManager.Settings.ProxyBlockSpotifyAds)
-            builder.AddRange(AdUrlPatterns.SpotifyPatterns);
-
-        if (HttpsProxyConfigManager.Settings.ProxyBlockPrimeVideoAds)
-            builder.AddRange(AdUrlPatterns.PrimeVideoPatterns);
-
-        if (HttpsProxyConfigManager.Settings.ProxyBlockDisneyPlusAds)
-            builder.AddRange(AdUrlPatterns.DisneyPlusPatterns);
-
-        if (HttpsProxyConfigManager.Settings.ProxyBlockGenericAds)
-            builder.AddRange(AdUrlPatterns.GenericAdPatterns);
-
-        // Load user patterns if exist
-        if (File.Exists(UserPatternsPath))
-        {
-            try
-            {
-                string json = File.ReadAllText(UserPatternsPath);
-                var userPatterns = JsonSerializer.Deserialize<List<AdPattern>>(json);
-                if (userPatterns != null)
-                    builder.AddRange(userPatterns);
-            }
-            catch (JsonException ex)
-            {
-                Debug.WriteLine($"[AdBlockingMiddleware] Error parsing user patterns: {ex.Message}");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[AdBlockingMiddleware] Error loading user patterns: {ex.Message}");
-            }
-        }
-
-        _activePatterns = builder.ToImmutable();
-    }
-
-    public static bool ShouldBlock(string host, string path, string query)
-    {
-        // Optimization: if no patterns, always allowed
-        if (_activePatterns.IsEmpty) return false;
-
-        foreach (var pattern in _activePatterns)
-        {
-            if (MatchHost(host, pattern.HostPattern))
-            {
-                if (path.Contains(pattern.PathContains, StringComparison.OrdinalIgnoreCase))
-                {
-                    if (string.IsNullOrEmpty(pattern.QueryContains) ||
-                        (!string.IsNullOrEmpty(query) && query.Contains(pattern.QueryContains, StringComparison.OrdinalIgnoreCase)))
-                    {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        return false;
-    }
-
-    private static bool MatchHost(string host, string pattern)
-    {
-        if (string.Equals(host, pattern, StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        if (pattern.StartsWith("*."))
-        {
-            string suffix = pattern.Substring(1); // ".domain.com"
-            return host.EndsWith(suffix, StringComparison.OrdinalIgnoreCase);
-        }
-
-        return false;
-    }
-
-    public static byte[] GetBlockResponse(string path)
-    {
-        // Video content: return empty 200 (or minimal valid MP4 if needed, but 200 OK is usually enough)
-        if (path.Contains(".mp4") || path.Contains(".m4v") || path.Contains("/videoplayback"))
-        {
-            return Encoding.UTF8.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
-        }
-
-        // JavaScript/tracking: 204 No Content
-        if (path.Contains(".js") || path.Contains("/api/stats/ads"))
-        {
-            return Encoding.UTF8.GetBytes("HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n");
-        }
-
-        // Image ads: 1x1 transparent pixel
-        if (path.Contains(".png") || path.Contains(".jpg") || path.Contains(".gif") || path.Contains(".webp"))
-        {
-            byte[] pixel = Convert.FromBase64String("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7");
-            string header = $"HTTP/1.1 200 OK\r\nContent-Type: image/gif\r\nContent-Length: {pixel.Length}\r\nConnection: close\r\n\r\n";
-            byte[] headerBytes = Encoding.UTF8.GetBytes(header);
-            byte[] response = new byte[headerBytes.Length + pixel.Length];
-            Buffer.BlockCopy(headerBytes, 0, response, 0, headerBytes.Length);
-            Buffer.BlockCopy(pixel, 0, response, headerBytes.Length, pixel.Length);
-            return response;
-        }
-
-        // Default: 204 No Content
-        return Encoding.UTF8.GetBytes("HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n");
-    }
-}
-</file>
-
-<file path="src/AegisDNS.Core/Proxy/ProxyConnectionHandler.cs">
+<file path="src/AegisDNS.Core/Proxy/HttpsProxyHost.cs">
 using System;
 using System.Buffers;
 using System.Collections.Concurrent;
@@ -3294,417 +2838,111 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
 using AegisDNS.Core.Security;
+using AegisDNS.Licensing;
+using Microsoft.Extensions.Logging;
 
 namespace AegisDNS.Core.Proxy;
 
 /// <summary>
-/// Phase 18 — Proxy Connection Handler.
-/// Handles TLS termination, per-host certificate selection, and upstream relaying.
+/// Phase 18 — HTTPS Proxy Host.
+/// Listens for redirected HTTPS traffic and delegates to ProxyConnectionHandler.
 /// </summary>
-public class ProxyConnectionHandler
+public class HttpsProxyHost
 {
-    private readonly TcpClient _client;
+    private static readonly ILogger _logger =
+        LoggerFactory.Create(b => b.AddConsole()).CreateLogger<HttpsProxyHost>();
 
-    public ProxyConnectionHandler(TcpClient client)
+    private TcpListener? _listener;
+    private CancellationTokenSource? _cts;
+    private readonly int _port;
+    private readonly int _maxConnections;
+    private int _currentConnections;
+
+    public int ActiveConnections => _currentConnections;
+
+    public HttpsProxyHost(int port = 8443, int maxConnections = 100)
     {
-        _client = client;
+        _port = port;
+        _maxConnections = maxConnections;
     }
 
-    public async Task ProcessAsync(CancellationToken ct)
+    public void Start()
     {
+        if (_listener != null) return;
+
         try
         {
-            var stream = _client.GetStream();
+            _listener = new TcpListener(IPAddress.Loopback, _port);
+            _listener.Start();
+            _cts = new CancellationTokenSource();
 
-            // 1. Peek SNI from ClientHello
-            // We need a custom peek mechanism because we need to read the data then reuse it for TLS or raw relay.
-            var peekingStream = new PeekableStream(stream);
-            string? hostName = await TryExtractSniAsync(peekingStream, ct);
+            _ = AcceptLoopAsync(_cts.Token);
 
-            if (string.IsNullOrEmpty(hostName))
-            {
-                Debug.WriteLine("[Proxy] Failed to extract SNI or not a TLS ClientHello. Closing.");
-                return;
-            }
-
-            // 2. Bypass check (Phase 18.5)
-            if (IsBypassed(hostName))
-            {
-                Debug.WriteLine($"[Proxy] BYPASS: {hostName}");
-                await RelayRawAsync(peekingStream, hostName, ct);
-                return;
-            }
-
-            // 3. Terminate TLS with client
-            var serverOptions = new SslServerAuthenticationOptions
-            {
-                ServerCertificateSelectionCallback = (sender, host) =>
-                {
-                    return CertificateManager.GenerateHostCert(host ?? hostName);
-                },
-                EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
-                ClientCertificateRequired = false
-            };
-
-            using var clientSslStream = new SslStream(peekingStream, false);
-            await clientSslStream.AuthenticateAsServerAsync(serverOptions, ct);
-
-            // 4. Connect to upstream
-            using var upstreamClient = new TcpClient();
-            await upstreamClient.ConnectAsync(hostName, 443, ct);
-            using var upstreamStream = upstreamClient.GetStream();
-
-            using var upstreamSslStream = new SslStream(upstreamStream, false);
-            await upstreamSslStream.AuthenticateAsClientAsync(hostName);
-
-            // 5. Relay and Block (Phase 18.3)
-            await RelayWithInterceptionAsync(clientSslStream, upstreamSslStream, hostName, ct);
+            _logger.LogInformation("[HttpsProxyHost] Listening on 127.0.0.1:{Port}", _port);
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[ProxyHandler] Error: {ex.Message}");
+            _logger.LogError(ex, "[HttpsProxyHost] Failed to start on port {Port}", _port);
+            _listener = null;
         }
     }
 
-    private bool IsBypassed(string hostName)
+    public void Stop()
     {
-        foreach (var pattern in HttpsProxyConfigManager.Settings.ProxyBypassDomains)
-        {
-            if (string.Equals(hostName, pattern, StringComparison.OrdinalIgnoreCase))
-                return true;
+        _cts?.Cancel();
+        _listener?.Stop();
+        _listener = null;
+        _logger.LogInformation("[HttpsProxyHost] Stopped.");
+    }
 
-            if (pattern.StartsWith("*."))
+    private async Task AcceptLoopAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
             {
-                string suffix = pattern.Substring(1);
-                if (hostName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-        }
-        return false;
-    }
+                var client = await _listener!.AcceptTcpClientAsync(ct);
 
-    private async Task RelayRawAsync(PeekableStream clientStream, string hostName, CancellationToken ct)
-    {
-        using var upstreamClient = new TcpClient();
-        await upstreamClient.ConnectAsync(hostName, 443, ct);
-        using var upstreamStream = upstreamClient.GetStream();
-
-        // Relay peeking buffer first
-        if (clientStream.PeekedData.Length > 0)
-        {
-            await upstreamStream.WriteAsync(clientStream.PeekedData, ct);
-        }
-
-        var clientToUpstream = clientStream.CopyToAsync(upstreamStream, ct);
-        var upstreamToClient = upstreamStream.CopyToAsync(clientStream, ct);
-
-        await Task.WhenAll(clientToUpstream, upstreamToClient);
-    }
-
-    private async Task RelayWithInterceptionAsync(SslStream clientStream, SslStream upstreamStream, string hostName, CancellationToken ct)
-    {
-        var clientToUpstream = InterceptRequestsAsync(clientStream, upstreamStream, hostName, ct);
-        var upstreamToClient = upstreamStream.CopyToAsync(clientStream, ct);
-
-        await Task.WhenAny(clientToUpstream, upstreamToClient);
-    }
-
-    private async Task InterceptRequestsAsync(Stream source, Stream destination, string hostName, CancellationToken ct)
-    {
-        byte[] buffer = ArrayPool<byte>.Shared.Rent(16384);
-        try
-        {
-            while (!ct.IsCancellationRequested)
-            {
-                int bytesRead = await source.ReadAsync(buffer, 0, buffer.Length, ct);
-                if (bytesRead == 0) break;
-
-                // Simple HTTP Request Line extraction
-                string data = Encoding.UTF8.GetString(buffer, 0, Math.Min(bytesRead, 1024));
-                int lineEnd = data.IndexOf("\r\n");
-                if (lineEnd > 0)
+                if (_currentConnections >= _maxConnections)
                 {
-                    string requestLine = data.Substring(0, lineEnd);
-                    var parts = requestLine.Split(' ');
-                    if (parts.Length >= 2)
-                    {
-                        string method = parts[0];
-                        string url = parts[1];
-
-                        string path = url;
-                        string query = "";
-                        int queryIdx = url.IndexOf('?');
-                        if (queryIdx >= 0)
-                        {
-                            path = url.Substring(0, queryIdx);
-                            query = url.Substring(queryIdx + 1);
-                        }
-
-                        if (AdBlockingMiddleware.ShouldBlock(hostName, path, query))
-                        {
-                            MetricsManager.IncrementProxyAdsBlocked();
-                            Debug.WriteLine($"[Proxy] BLOCKED: https://{hostName}{url}");
-                            byte[] response = AdBlockingMiddleware.GetBlockResponse(path);
-                            await source.WriteAsync(response, 0, response.Length, ct);
-                            await source.FlushAsync(ct);
-                            continue;
-                        }
-                    }
+                    client.Close();
+                    continue;
                 }
 
-                await destination.WriteAsync(buffer, 0, bytesRead, ct);
-                await destination.FlushAsync(ct);
+                _ = HandleConnectionAsync(client, ct);
+            }
+            catch (OperationCanceledException) { break; }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[HttpsProxyHost] Accept error");
             }
         }
-        catch { }
+    }
+
+    private async Task HandleConnectionAsync(TcpClient client, CancellationToken ct)
+    {
+        Interlocked.Increment(ref _currentConnections);
+        MetricsManager.IncrementProxyRequests(); // Assuming this will be added in 18.9
+
+        try
+        {
+            using (client)
+            {
+                var handler = new ProxyConnectionHandler(client);
+                await handler.ProcessAsync(ct);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[HttpsProxyHost] Connection error");
+        }
         finally
         {
-            ArrayPool<byte>.Shared.Return(buffer);
-        }
-    }
-
-    private async Task<string?> TryExtractSniAsync(PeekableStream stream, CancellationToken ct)
-    {
-        // We need to read the first 5 bytes to get record length
-        byte[] header = new byte[5];
-        if (await stream.PeekFullyAsync(header, ct) != 5) return null;
-
-        if (header[0] != 0x16) return null;
-
-        int recordLen = (header[3] << 8) | header[4];
-        byte[] record = new byte[recordLen];
-        if (await stream.PeekFullyAsync(record, ct, 5) != recordLen) return null;
-
-        // Skip handshake header (1 byte type, 3 bytes length)
-        // Handshake type 0x01 = ClientHello
-        if (record[0] != 0x01) return null;
-
-        try
-        {
-            int pos = 38; // Handshake header(4), Version(2), Random(32)
-            if (pos >= record.Length) return null;
-
-            int sessionIDLen = record[pos++];
-            pos += sessionIDLen;
-            if (pos >= record.Length) return null;
-
-            int cipherSuiteLen = (record[pos] << 8) | record[pos + 1];
-            pos += 2 + cipherSuiteLen;
-            if (pos >= record.Length) return null;
-
-            int compressionLen = record[pos++];
-            pos += compressionLen;
-            if (pos >= record.Length) return null;
-
-            if (pos + 2 > record.Length) return null;
-            int extensionsLen = (record[pos] << 8) | record[pos + 1];
-            pos += 2;
-
-            int end = pos + extensionsLen;
-            while (pos + 4 <= end && pos + 4 <= record.Length)
-            {
-                int extType = (record[pos] << 8) | record[pos + 1];
-                int extLen = (record[pos + 2] << 8) | record[pos + 3];
-                pos += 4;
-
-                if (extType == 0x00)
-                {
-                    if (pos + 2 > record.Length) return null;
-                    int listLen = (record[pos] << 8) | record[pos + 1];
-                    pos += 2;
-
-                    if (pos + 3 > record.Length) return null;
-                    int nameType = record[pos];
-                    int nameLen = (record[pos + 1] << 8) | record[pos + 2];
-                    pos += 3;
-
-                    if (nameType == 0x00 && pos + nameLen <= record.Length)
-                    {
-                        return Encoding.UTF8.GetString(record, pos, nameLen);
-                    }
-                }
-                pos += extLen;
-            }
-        }
-        catch { }
-        return null;
-    }
-
-    private class PeekableStream : Stream
-    {
-        private readonly Stream _inner;
-        private readonly MemoryStream _peeked = new();
-        private long _peekedReadPos = 0;
-
-        public byte[] PeekedData => _peeked.ToArray();
-
-        public PeekableStream(Stream inner) => _inner = inner;
-
-        public async Task<int> PeekFullyAsync(byte[] buffer, CancellationToken ct, int offset = 0)
-        {
-            // This is a special peek that doesn't advance the logical stream position for the user
-            // but populates the internal buffer.
-
-            // If we already have enough data in peeked buffer at the specified offset
-            if (_peeked.Length >= offset + buffer.Length)
-            {
-                var data = _peeked.ToArray();
-                Buffer.BlockCopy(data, offset, buffer, 0, buffer.Length);
-                return buffer.Length;
-            }
-
-            // Read from inner to fill peeked buffer up to required length
-            int toRead = (offset + buffer.Length) - (int)_peeked.Length;
-            byte[] temp = new byte[toRead];
-            int read = await _inner.ReadAsync(temp, 0, toRead, ct);
-            if (read > 0)
-            {
-                _peeked.Write(temp, 0, read);
-            }
-
-            if (_peeked.Length >= offset + buffer.Length)
-            {
-                var data = _peeked.ToArray();
-                Buffer.BlockCopy(data, offset, buffer, 0, buffer.Length);
-                return buffer.Length;
-            }
-
-            return (int)_peeked.Length - offset;
-        }
-
-        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
-        {
-            if (_peekedReadPos < _peeked.Length)
-            {
-                int toCopy = Math.Min(buffer.Length, (int)(_peeked.Length - _peekedReadPos));
-                _peeked.ToArray().AsMemory((int)_peekedReadPos, toCopy).CopyTo(buffer);
-                _peekedReadPos += toCopy;
-                return toCopy;
-            }
-
-            return await _inner.ReadAsync(buffer, cancellationToken);
-        }
-
-        // Standard Stream overrides
-        public override bool CanRead => _inner.CanRead;
-        public override bool CanSeek => false;
-        public override bool CanWrite => _inner.CanWrite;
-        public override long Length => _inner.Length;
-        public override long Position { get => _inner.Position; set => throw new NotSupportedException(); }
-        public override void Flush() => _inner.Flush();
-        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException("Use ReadAsync");
-        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
-        public override void SetLength(long value) => throw new NotSupportedException();
-        public override void Write(byte[] buffer, int offset, int count) => _inner.Write(buffer, offset, count);
-        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) => _inner.WriteAsync(buffer, offset, count, cancellationToken);
-    }
-}
-</file>
-
-<file path="src/AegisDNS.Core/Proxy/TrafficRedirector.cs">
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Threading.Tasks;
-
-namespace AegisDNS.Core.Proxy;
-
-/// <summary>
-/// Phase 18 — Traffic Redirector.
-/// Manages iptables rules to redirect HTTPS traffic to the local proxy.
-/// </summary>
-public static class TrafficRedirector
-{
-    private static bool _isEnabled;
-
-    public static bool IsEnabled() => _isEnabled;
-
-    public static void Enable(int proxyPort)
-    {
-        if (_isEnabled) return;
-
-        try
-        {
-            Debug.WriteLine($"[TrafficRedirector] Enabling redirection to port {proxyPort}...");
-
-            // 1. Skip loopback (so proxy can connect to upstream)
-            // -I OUTPUT 1 inserts at the top
-            RunIptables("-t", "nat", "-I", "OUTPUT", "1", "-p", "tcp", "--dport", "443", "-o", "lo", "-j", "RETURN");
-
-            // 2. Redirect all other outbound 443 to local proxy
-            RunIptables("-t", "nat", "-A", "OUTPUT", "-p", "tcp", "--dport", "443", "-j", "REDIRECT", "--to-port", proxyPort.ToString());
-
-            _isEnabled = true;
-            Debug.WriteLine("[TrafficRedirector] HTTPS redirection active.");
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[TrafficRedirector] Enable failed: {ex.Message}");
-            Disable(); // Cleanup any partial rules
-        }
-    }
-
-    public static void Disable()
-    {
-        try
-        {
-            Debug.WriteLine("[TrafficRedirector] Disabling redirection...");
-
-            // Use -D to delete the exact rules we added. 
-            // We'll call it multiple times to be sure, and catch errors if rules don't exist.
-
-            // Delete the REDIRECT rule first
-            RunIptables("-t", "nat", "-D", "OUTPUT", "-p", "tcp", "--dport", "443", "-j", "REDIRECT", "--to-port", HttpsProxyConfigManager.Settings.ProxyPort.ToString());
-
-            // Delete the loopback RETURN rule
-            RunIptables("-t", "nat", "-D", "OUTPUT", "-p", "tcp", "--dport", "443", "-o", "lo", "-j", "RETURN");
-
-            _isEnabled = false;
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[TrafficRedirector] Disable error (non-fatal): {ex.Message}");
-        }
-    }
-
-    private static void RunIptables(params string[] args)
-    {
-        if (!OperatingSystem.IsLinux()) return;
-
-        try
-        {
-            // Note: Service has CAP_NET_ADMIN so this should work without pkexec if running as service.
-            // If running in dev mode, it might need pkexec.
-            string cmd = "iptables";
-
-            var psi = new ProcessStartInfo(cmd)
-            {
-                CreateNoWindow = true,
-                UseShellExecute = false
-            };
-
-            foreach (var arg in args)
-                psi.ArgumentList.Add(arg);
-
-            using var process = Process.Start(psi);
-            process?.WaitForExit(5000);
-
-            if (process?.ExitCode != 0)
-            {
-                Debug.WriteLine($"[TrafficRedirector] iptables {string.Join(" ", args)} returned {process?.ExitCode}");
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[TrafficRedirector] iptables execution failed: {ex.Message}");
+            Interlocked.Decrement(ref _currentConnections);
         }
     }
 }
@@ -3793,268 +3031,6 @@ public class BlockSchedule
     public TimeSpan StartTime { get; set; }
     public TimeSpan EndTime { get; set; }
     public bool Enabled { get; set; } = true;
-}
-</file>
-
-<file path="src/AegisDNS.Core/Security/CertificateManager.cs">
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
-using System.Threading.Tasks;
-
-using AegisDNS.Licensing;
-
-namespace AegisDNS.Core.Security;
-
-/// <summary>
-/// Phase 18 — Local CA Certificate Manager.
-/// Manages the generation and installation of the local root CA used for HTTPS interception.
-/// Also handles dynamic generation of per-host ECDSA P-256 certificates.
-/// </summary>
-public static class CertificateManager
-{
-    private static readonly string CaDir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".config", "aegisdns", "ca");
-
-    private static readonly string PfxPath = Path.Combine(CaDir, "aegisdns-ca.pfx");
-    private static readonly string PemPath = Path.Combine(CaDir, "aegisdns-ca.pem");
-    private static readonly string PassphrasePath = Path.Combine(CaDir, "ca.key.token");
-
-    private static readonly ConcurrentDictionary<string, (X509Certificate2 Cert, DateTime Expiry)> _certCache = new();
-
-    private static X509Certificate2? _caCert;
-
-    static CertificateManager()
-    {
-        if (!Directory.Exists(CaDir))
-            Directory.CreateDirectory(CaDir);
-    }
-
-    /// <summary>
-    /// Gets or generates the local CA certificate.
-    /// </summary>
-    public static X509Certificate2 GetOrGenerateCa()
-    {
-        if (_caCert != null) return _caCert;
-
-        if (File.Exists(PfxPath))
-        {
-            try
-            {
-                string? passphrase = AesGcmTokenStore.Decrypt(PassphrasePath);
-                if (passphrase != null)
-                {
-                    _caCert = X509CertificateLoader.LoadPkcs12FromFile(PfxPath, passphrase, X509KeyStorageFlags.Exportable);
-                    return _caCert;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[CertificateManager] Failed to load CA: {ex.Message}");
-            }
-        }
-
-        return GenerateCa();
-    }
-
-    private static X509Certificate2 GenerateCa()
-    {
-        Debug.WriteLine("[CertificateManager] Generating new Local CA...");
-
-        using var rsa = RSA.Create(2048);
-        var request = new CertificateRequest(
-            "CN=AegisDNS Local CA, O=AegisDNS",
-            rsa,
-            HashAlgorithmName.SHA256,
-            RSASignaturePadding.Pkcs1);
-
-        request.CertificateExtensions.Add(
-            new X509BasicConstraintsExtension(true, false, 0, true));
-
-        request.CertificateExtensions.Add(
-            new X509KeyUsageExtension(
-                X509KeyUsageFlags.KeyCertSign | X509KeyUsageFlags.CrlSign,
-                true));
-
-        var notBefore = DateTimeOffset.UtcNow.AddDays(-1);
-        var notAfter = notBefore.AddYears(10);
-
-        var cert = request.CreateSelfSigned(notBefore, notAfter);
-
-        // Export with a random passphrase
-        string passphrase = Guid.NewGuid().ToString("N");
-        byte[] pfxData = cert.Export(X509ContentType.Pfx, passphrase);
-
-        File.WriteAllBytes(PfxPath, pfxData);
-        if (OperatingSystem.IsLinux())
-            File.SetUnixFileMode(PfxPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-
-        // Store passphrase securely
-        AesGcmTokenStore.Encrypt(passphrase, PassphrasePath);
-
-        // Export public PEM for trust store installation
-        string pem = cert.ExportCertificatePem();
-        File.WriteAllText(PemPath, pem);
-        if (OperatingSystem.IsLinux())
-            File.SetUnixFileMode(PemPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-
-        _caCert = X509CertificateLoader.LoadPkcs12(pfxData, passphrase, X509KeyStorageFlags.Exportable);
-        return _caCert;
-    }
-
-    /// <summary>
-    /// Installs the CA certificate into the system trust store using pkexec for elevation.
-    /// </summary>
-    public static async Task<bool> InstallCaCertAsync()
-    {
-        if (!File.Exists(PemPath)) GetOrGenerateCa();
-
-        return await Task.Run(() =>
-        {
-            try
-            {
-                string targetPath = "/usr/local/share/ca-certificates/aegisdns-ca.crt";
-                string updateCmd = "update-ca-certificates";
-
-                // Check for Fedora/RHEL path
-                if (Directory.Exists("/etc/pki/ca-trust/source/anchors/"))
-                {
-                    targetPath = "/etc/pki/ca-trust/source/anchors/aegisdns-ca.crt";
-                    updateCmd = "update-ca-trust";
-                }
-
-                var psi = new ProcessStartInfo("pkexec")
-                {
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-
-                // Use 'sh -c' to combine commands under sudo/pkexec
-                psi.ArgumentList.Add("sh");
-                psi.ArgumentList.Add("-c");
-                psi.ArgumentList.Add($"cp \"{PemPath}\" \"{targetPath}\" && {updateCmd}");
-
-                var process = Process.Start(psi);
-                process?.WaitForExit();
-
-                return process?.ExitCode == 0;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[CertificateManager] Installation failed: {ex.Message}");
-                return false;
-            }
-        });
-    }
-
-    /// <summary>
-    /// Removes the CA certificate from the system trust store.
-    /// </summary>
-    public static async Task<bool> RemoveCaCertAsync()
-    {
-        return await Task.Run(() =>
-        {
-            try
-            {
-                string targetPath = "/usr/local/share/ca-certificates/aegisdns-ca.crt";
-                string updateCmd = "update-ca-certificates";
-
-                if (File.Exists("/etc/pki/ca-trust/source/anchors/aegisdns-ca.crt"))
-                {
-                    targetPath = "/etc/pki/ca-trust/source/anchors/aegisdns-ca.crt";
-                    updateCmd = "update-ca-trust";
-                }
-
-                var psi = new ProcessStartInfo("pkexec")
-                {
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-
-                psi.ArgumentList.Add("sh");
-                psi.ArgumentList.Add("-c");
-                psi.ArgumentList.Add($"rm -f \"{targetPath}\" && {updateCmd}");
-
-                var process = Process.Start(psi);
-                process?.WaitForExit();
-
-                return process?.ExitCode == 0;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[CertificateManager] Removal failed: {ex.Message}");
-                return false;
-            }
-        });
-    }
-
-    /// <summary>
-    /// Generates a short-lived ECDSA P-256 certificate for the specified hostname.
-    /// Signed by the local CA.
-    /// </summary>
-    public static X509Certificate2 GenerateHostCert(string hostname)
-    {
-        if (_certCache.TryGetValue(hostname, out var cached) && cached.Expiry > DateTime.UtcNow.AddMinutes(5))
-        {
-            return cached.Cert;
-        }
-
-        var ca = GetOrGenerateCa();
-
-        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        var request = new CertificateRequest(
-            $"CN={hostname}",
-            ecdsa,
-            HashAlgorithmName.SHA256);
-
-        var sanBuilder = new SubjectAlternativeNameBuilder();
-        sanBuilder.AddDnsName(hostname);
-        request.CertificateExtensions.Add(sanBuilder.Build());
-
-        // Host certs are NOT CAs
-        request.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, true));
-
-        // Key usage for TLS server
-        request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, true));
-        request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(
-            new OidCollection { new Oid("1.3.6.1.5.5.7.3.1") }, // Server Auth
-            false));
-
-        var notBefore = DateTimeOffset.UtcNow.AddMinutes(-5);
-        var notAfter = notBefore.AddHours(24);
-
-        // Serial number generation (must be positive)
-        byte[] serialNumber = new byte[8];
-        RandomNumberGenerator.Fill(serialNumber);
-        serialNumber[0] &= 0x7F; // Ensure positive
-
-        // Sign with CA
-        using var hostCert = request.Create(ca, notBefore, notAfter, serialNumber);
-
-        // We MUST associate the private key with the certificate for SslStream to use it.
-        var certWithKey = hostCert.CopyWithPrivateKey(ecdsa);
-
-        _certCache[hostname] = (certWithKey, notAfter.UtcDateTime);
-        return certWithKey;
-    }
-
-    /// <summary>
-    /// Checks if the CA certificate is installed in the system trust store.
-    /// </summary>
-    public static bool IsCaInstalled()
-    {
-        if (File.Exists("/usr/local/share/ca-certificates/aegisdns-ca.crt")) return true;
-        if (File.Exists("/etc/pki/ca-trust/source/anchors/aegisdns-ca.crt")) return true;
-
-        return false;
-    }
 }
 </file>
 
@@ -4588,6 +3564,58 @@ public class DoHClient
 }
 </file>
 
+<file path="src/AegisDNS.Core/Core/StreamingBlockEngine.cs">
+using AegisDNS.Core.Utilities;
+using AegisDNS.Licensing;
+
+namespace AegisDNS.Core;
+
+/// <summary>
+/// Evaluates DNS queries against streaming platform ad/tracking blocklists.
+/// All checks are synchronous O(1) ImmutableHashSet lookups — no hot-path overhead.
+/// Gated on Pro+ license tier. Phase 17 — DNS Streaming Ad Blocker.
+/// </summary>
+public static class StreamingBlockEngine
+{
+    /// <summary>
+    /// Returns true if the given domain (or any of its parent domains) is in an enabled
+    /// streaming platform blocklist. Returns false immediately for free-tier users.
+    /// Subdomain matching: "foo.ads.spotify.com" matches because "ads.spotify.com" is listed.
+    /// </summary>
+    public static bool IsStreamingAdDomain(string domain)
+    {
+        if (LicenseManager.CurrentTier < LicenseManager.LicenseTier.Pro)
+            return false;
+
+        var settings = StreamingConfigManager.Settings;
+        if (!settings.EnableStreamingAdBlock)
+            return false;
+
+        // Build candidate list: the domain itself plus all parent-label suffixes.
+        // E.g. "foo.ads.spotify.com" → ["foo.ads.spotify.com", "ads.spotify.com", "spotify.com"]
+        // This gives subdomain matching without any string allocation loop in the common case.
+        ReadOnlySpan<char> remaining = domain.AsSpan();
+        while (true)
+        {
+            string candidate = remaining.ToString();
+
+            if (settings.BlockSpotifyAds && StreamingBlocklists.SpotifyAds.Contains(candidate)) return true;
+            if (settings.BlockTwitchAds && StreamingBlocklists.TwitchAds.Contains(candidate)) return true;
+            if (settings.BlockHuluAds && StreamingBlocklists.HuluAds.Contains(candidate)) return true;
+            if (settings.BlockPeacockAds && StreamingBlocklists.PeacockAds.Contains(candidate)) return true;
+            if (settings.BlockParamountAds && StreamingBlocklists.ParamountAds.Contains(candidate)) return true;
+            if (settings.BlockYouTubeTracking && StreamingBlocklists.YouTubeTracking.Contains(candidate)) return true;
+
+            int dot = remaining.IndexOf('.');
+            if (dot < 0) break;
+            remaining = remaining[(dot + 1)..];
+        }
+
+        return false;
+    }
+}
+</file>
+
 <file path="src/AegisDNS.Core/Dns/DotClient.cs">
 using System;
 using System.IO;
@@ -5016,6 +4044,158 @@ public class AiWatchdog
 }
 </file>
 
+<file path="src/AegisDNS.Core/Monitoring/LatencyMonitor.cs">
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Net;
+using System.Threading;
+using System.Threading.Tasks;
+
+using ARSoft.Tools.Net;
+using ARSoft.Tools.Net.Dns;
+
+namespace AegisDNS.Core.Monitoring;
+
+/// <summary>
+/// Pings the configured upstream DNS server every 30 seconds using a real DNS query.
+/// Records a rolling average of the last 5 samples and publishes to MetricsManager.
+/// Non-fatal: failures set latency to -1 (displayed as "—").
+/// </summary>
+public sealed class LatencyMonitor
+{
+    private static readonly string[] PresetUpstreams = ["1.1.1.1", "8.8.8.8", "9.9.9.9"];
+    private const int PingIntervalSeconds = 30;
+    private const int RollingWindowSize = 5;
+
+    private readonly AegisEngine _engine;
+    private readonly Queue<long> _samples = new();
+    private CancellationTokenSource? _cts;
+
+    public LatencyMonitor(AegisEngine engine)
+    {
+        _engine = engine;
+    }
+
+    public void Start()
+    {
+        _cts = new CancellationTokenSource();
+        _ = Task.Run(() => RunLoop(_cts.Token), _cts.Token);
+    }
+
+    public void Stop()
+    {
+        _cts?.Cancel();
+    }
+
+    private async Task RunLoop(CancellationToken token)
+    {
+        while (!token.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(PingIntervalSeconds), token).ConfigureAwait(false);
+                PingCurrentUpstream();
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch { }
+        }
+    }
+
+    private void PingCurrentUpstream()
+    {
+        try
+        {
+            string upstream = DnsConfigManager.Settings.PrimaryDns;
+            if (!IPAddress.TryParse(upstream, out var upstreamIp)) return;
+
+            var sw = Stopwatch.StartNew();
+            var client = new DnsClient(new List<IPAddress> { upstreamIp }, 5000);
+            var result = client.Resolve(DomainName.Parse("example.com"), RecordType.A, RecordClass.INet);
+            sw.Stop();
+
+            long latencyMs = result != null ? sw.ElapsedMilliseconds : -1;
+            UpdateSamples(latencyMs);
+
+            int thresholdMs = DnsConfigManager.Settings.LatencyAlertThresholdMs;
+
+            if (latencyMs >= 0 && latencyMs > thresholdMs)
+            {
+                if (!MetricsManager.Current.LatencyWarning)
+                {
+                    MetricsManager.SetLatencyWarning(true);
+                    _engine.Broadcast($"⚠️ DNS latency warning: {latencyMs}ms exceeds threshold of {thresholdMs}ms");
+                }
+            }
+            else if (latencyMs >= 0)
+            {
+                MetricsManager.SetLatencyWarning(false);
+            }
+        }
+        catch { }
+    }
+
+    private void UpdateSamples(long latencyMs)
+    {
+        lock (_samples)
+        {
+            if (latencyMs >= 0)
+            {
+                _samples.Enqueue(latencyMs);
+                while (_samples.Count > RollingWindowSize)
+                    _samples.Dequeue();
+
+                long sum = 0;
+                foreach (var s in _samples) sum += s;
+                int avg = (int)(sum / _samples.Count);
+                MetricsManager.SetUpstreamLatency(avg);
+            }
+            else
+            {
+                MetricsManager.SetUpstreamLatency(-1);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Sends one test query to each preset upstream and returns a list sorted by latency.
+    /// Exposed for future "pick fastest upstream" feature.
+    /// </summary>
+    public IReadOnlyList<(string Upstream, long LatencyMs)> CompareUpstreams()
+    {
+        var results = new List<(string Upstream, long LatencyMs)>();
+        foreach (var upstream in PresetUpstreams)
+        {
+            try
+            {
+                if (!IPAddress.TryParse(upstream, out var ip)) continue;
+                var sw = Stopwatch.StartNew();
+                var client = new DnsClient(new List<IPAddress> { ip }, 5000);
+                var result = client.Resolve(DomainName.Parse("example.com"), RecordType.A, RecordClass.INet);
+                sw.Stop();
+                results.Add((upstream, result != null ? sw.ElapsedMilliseconds : -1L));
+            }
+            catch
+            {
+                results.Add((upstream, -1L));
+            }
+        }
+
+        results.Sort((a, b) =>
+        {
+            if (a.LatencyMs < 0) return 1;
+            if (b.LatencyMs < 0) return -1;
+            return a.LatencyMs.CompareTo(b.LatencyMs);
+        });
+
+        return results.AsReadOnly();
+    }
+}
+</file>
+
 <file path="src/AegisDNS.Core/Monitoring/SessionManager.cs">
 using System;
 
@@ -5203,6 +4383,148 @@ public class ProcessRuleEngine
 
     /// <summary>Returns all current rules for UI display.</summary>
     public IEnumerable<ProcessDnsRule> GetAll() => _rules.Values;
+}
+</file>
+
+<file path="src/AegisDNS.Core/Proxy/AdBlockingMiddleware.cs">
+using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Text.Json;
+
+namespace AegisDNS.Core.Proxy;
+
+/// <summary>
+/// Phase 18 — Ad Blocking Middleware.
+/// Decides whether an HTTPS request should be blocked based on URL patterns.
+/// </summary>
+public static class AdBlockingMiddleware
+{
+    private static readonly string UserPatternsPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".config", "aegisdns", "proxy_patterns.json");
+
+    private static ImmutableList<AdPattern> _activePatterns = ImmutableList<AdPattern>.Empty;
+
+    static AdBlockingMiddleware()
+    {
+        ReloadPatterns();
+        HttpsProxyConfigManager.SettingsChanged += ReloadPatterns;
+    }
+
+    public static void ReloadPatterns()
+    {
+        var builder = ImmutableList.CreateBuilder<AdPattern>();
+
+        // Add defaults based on settings
+        if (HttpsProxyConfigManager.Settings.ProxyBlockYouTubeAds)
+            builder.AddRange(AdUrlPatterns.YouTubePatterns);
+
+        if (HttpsProxyConfigManager.Settings.ProxyBlockSpotifyAds)
+            builder.AddRange(AdUrlPatterns.SpotifyPatterns);
+
+        if (HttpsProxyConfigManager.Settings.ProxyBlockPrimeVideoAds)
+            builder.AddRange(AdUrlPatterns.PrimeVideoPatterns);
+
+        if (HttpsProxyConfigManager.Settings.ProxyBlockDisneyPlusAds)
+            builder.AddRange(AdUrlPatterns.DisneyPlusPatterns);
+
+        if (HttpsProxyConfigManager.Settings.ProxyBlockGenericAds)
+            builder.AddRange(AdUrlPatterns.GenericAdPatterns);
+
+        // Load user patterns if exist
+        if (File.Exists(UserPatternsPath))
+        {
+            try
+            {
+                string json = File.ReadAllText(UserPatternsPath);
+                var userPatterns = JsonSerializer.Deserialize<List<AdPattern>>(json);
+                if (userPatterns != null)
+                    builder.AddRange(userPatterns);
+            }
+            catch (JsonException ex)
+            {
+                Debug.WriteLine($"[AdBlockingMiddleware] Error parsing user patterns: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[AdBlockingMiddleware] Error loading user patterns: {ex.Message}");
+            }
+        }
+
+        _activePatterns = builder.ToImmutable();
+    }
+
+    public static bool ShouldBlock(string host, string path, string query)
+    {
+        // Optimization: if no patterns, always allowed
+        if (_activePatterns.IsEmpty) return false;
+
+        foreach (var pattern in _activePatterns)
+        {
+            if (MatchHost(host, pattern.HostPattern))
+            {
+                if (path.Contains(pattern.PathContains, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (string.IsNullOrEmpty(pattern.QueryContains) ||
+                        (!string.IsNullOrEmpty(query) && query.Contains(pattern.QueryContains, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool MatchHost(string host, string pattern)
+    {
+        if (string.Equals(host, pattern, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (pattern.StartsWith("*."))
+        {
+            string suffix = pattern.Substring(1); // ".domain.com"
+            return host.EndsWith(suffix, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return false;
+    }
+
+    public static byte[] GetBlockResponse(string path)
+    {
+        // Video content: return empty 200 (or minimal valid MP4 if needed, but 200 OK is usually enough)
+        if (path.Contains(".mp4") || path.Contains(".m4v") || path.Contains("/videoplayback"))
+        {
+            return Encoding.UTF8.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+        }
+
+        // JavaScript/tracking: 204 No Content
+        if (path.Contains(".js") || path.Contains("/api/stats/ads"))
+        {
+            return Encoding.UTF8.GetBytes("HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n");
+        }
+
+        // Image ads: 1x1 transparent pixel
+        if (path.Contains(".png") || path.Contains(".jpg") || path.Contains(".gif") || path.Contains(".webp"))
+        {
+            byte[] pixel = Convert.FromBase64String("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7");
+            string header = $"HTTP/1.1 200 OK\r\nContent-Type: image/gif\r\nContent-Length: {pixel.Length}\r\nConnection: close\r\n\r\n";
+            byte[] headerBytes = Encoding.UTF8.GetBytes(header);
+            byte[] response = new byte[headerBytes.Length + pixel.Length];
+            Buffer.BlockCopy(headerBytes, 0, response, 0, headerBytes.Length);
+            Buffer.BlockCopy(pixel, 0, response, headerBytes.Length, pixel.Length);
+            return response;
+        }
+
+        // Default: 204 No Content
+        return Encoding.UTF8.GetBytes("HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n");
+    }
 }
 </file>
 
@@ -5534,102 +4856,6 @@ public static class AllowlistManager
         {
             System.Diagnostics.Debug.WriteLine($"❌ Allowlist save failed: {ex.Message}");
         }
-    }
-}
-</file>
-
-<file path="src/AegisDNS.Core/Utilities/BlocklistManager.cs">
-using System;
-using System.Collections.Generic;
-using System.Runtime.Versioning;
-using System.Threading.Tasks;
-
-using AegisDNS.Core;
-using AegisDNS.Licensing;
-
-namespace AegisDNS.Core;
-
-/// <summary>
-/// High-level façade over BlocklistUpdater.
-/// Selects the correct Hagezi blocklist URLs based on license tier and settings.
-/// </summary>
-public class BlocklistManager
-{
-    private readonly BlocklistUpdater _updater = new();
-
-    /// <summary>
-    /// Fetches and parses the appropriate blocklists based on license tier and settings.
-    /// </summary>
-    public async Task<IEnumerable<string>> FetchAndParseAsync(Func<string, Task>? logger = null)
-    {
-        var urls = GetActiveBlocklistUrls();
-
-        // Bridge async logger to sync Action for BlocklistUpdater
-        Action<string>? syncLogger = logger != null
-            ? msg => logger(msg).ConfigureAwait(false)
-            : null;
-
-        var domains = new List<string>(await _updater.UpdateMultipleAsync(urls, syncLogger));
-
-        // Inject embedded gaming launcher domains (no network fetch — built in)
-        if (BlocklistConfigManager.Settings.EnableGamingLauncherBlocking)
-        {
-            domains.AddRange(GamingLauncherDomains.GetAll());
-            syncLogger?.Invoke("🎮 Gaming launcher ad domains loaded.");
-        }
-
-        return domains;
-    }
-
-    /// <summary>
-    /// Returns the currently active blocklist URLs based on license and settings.
-    /// </summary>
-    public static List<string> GetActiveBlocklistUrls()
-    {
-        var urls = new List<string>();
-
-        // 1. Determine Tier-based Primary List
-#pragma warning disable CA1416
-        LicenseManager.LicenseTier tier = LicenseManager.LicenseTier.Community;
-
-#if DEBUG
-        // Force highest tier for developer testing
-        tier = LicenseManager.LicenseTier.Enterprise;
-#endif
-
-        string primaryList = tier switch
-        {
-            LicenseManager.LicenseTier.Pro or
-            LicenseManager.LicenseTier.AegisPrime or
-            LicenseManager.LicenseTier.Enterprise or
-            LicenseManager.LicenseTier.Founder or
-            LicenseManager.LicenseTier.Developer => HageziBlocklists.ProPlus,
-            _ => HageziBlocklists.Normal
-        };
-#pragma warning restore CA1416
-        urls.Add(primaryList);
-
-        // 2. Add-on Lists based on User Settings
-        var s = BlocklistConfigManager.Settings;
-        if (s.EnableThreatIntelligence) urls.Add(HageziBlocklists.ThreatIntelligence);
-        if (s.EnableFakeBlocking) urls.Add(HageziBlocklists.Fake);
-        if (s.EnablePopUpAdsBlocking) urls.Add(HageziBlocklists.PopUpAds);
-        if (s.EnableDynamicDnsBlocking) urls.Add(HageziBlocklists.DynamicDns);
-        if (s.EnableNrdBlocking) urls.Add(HageziBlocklists.NewlyRegisteredDomains);
-        if (s.EnableGamblingBlocking) urls.Add(HageziBlocklists.Gambling);
-        if (s.BlockAdultContent) urls.Add(HageziBlocklists.Nsfw);
-
-        return urls;
-    }
-
-    /// <summary>
-    /// Returns the currently selected primary blocklist URL (Legacy Support).
-    /// </summary>
-    [Obsolete("Use GetActiveBlocklistUrls instead.")]
-    public static string GetActiveUrl()
-    {
-        var urls = GetActiveBlocklistUrls();
-        return urls.Count > 0 ? urls[0] : string.Empty;
     }
 }
 </file>
@@ -6872,146 +6098,831 @@ public class LinuxDnsManager : ISystemDnsManager
 }
 </file>
 
-<file path="src/AegisDNS.Core/Utilities/AiLearnedBlocklist.cs">
+<file path="src/AegisDNS.Core/Proxy/ProxyConnectionHandler.cs">
 using System;
+using System.Buffers;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Collections.Immutable;
+using System.Diagnostics;
 using System.IO;
-using System.Linq;
+using System.Net;
+using System.Net.Security;
+using System.Net.Sockets;
+using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
-namespace AegisDNS.Core.Utilities;
+using AegisDNS.Core.Security;
+using Microsoft.Extensions.Logging;
 
-public static class AiLearnedBlocklist
+namespace AegisDNS.Core.Proxy;
+
+/// <summary>
+/// Phase 18 — Proxy Connection Handler.
+/// Handles TLS termination, per-host certificate selection, and upstream relaying.
+/// </summary>
+public class ProxyConnectionHandler
 {
-    private static readonly string AppFolder = Path.Combine(
-        Environment.GetEnvironmentVariable("XDG_DATA_HOME")
-            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share", "aegisdns"),
-        "AegisDNS");
-    private static readonly string ListPath = Path.Combine(AppFolder, "ai_learned.blocklist");
+    private static readonly ILogger _logger =
+        LoggerFactory.Create(b => b.AddConsole()).CreateLogger<ProxyConnectionHandler>();
 
-    private static ImmutableHashSet<string> _list = ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase);
+    private readonly TcpClient _client;
 
-    private static readonly ImmutableHashSet<string> _permanentSafelist =
-        ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase,
-            "google.com", "www.google.com", "mail.google.com", "accounts.google.com",
-            "googleapis.com", "gstatic.com",
-            "youtube.com", "www.youtube.com", "youtu.be", "ytimg.com",
-            "sync-v2.brave.com", "collector.wdp.brave.com", "brave.com",
-            "claude.ai", "anthropic.com",
-            "microsoft.com", "live.com", "outlook.com", "office.com",
-            "apple.com", "icloud.com",
-            "github.com", "githubusercontent.com",
-            "cloudflare.com", "cdn.jsdelivr.net", "cdnjs.cloudflare.com"
-        );
-
-    public static event Action? CollectionChanged;
-
-    public static int Count => _list.Count;
-
-    public static void Load()
+    public ProxyConnectionHandler(TcpClient client)
     {
+        _client = client;
+    }
+
+    public async Task ProcessAsync(CancellationToken ct)
+    {
+        string? hostName = null;
         try
         {
-            if (!File.Exists(ListPath))
+            var stream = _client.GetStream();
+
+            // 1. Peek SNI from ClientHello
+            // We need a custom peek mechanism because we need to read the data then reuse it for TLS or raw relay.
+            var peekingStream = new PeekableStream(stream);
+            hostName = await TryExtractSniAsync(peekingStream, ct);
+
+            if (string.IsNullOrEmpty(hostName))
             {
-                ImmutableInterlocked.Update(ref _list, _ => ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase));
+                _logger.LogInformation("[Proxy] Failed to extract SNI or not a TLS ClientHello. Closing.");
                 return;
             }
 
-            var lines = File.ReadAllLines(ListPath)
-                            .Where(l => !string.IsNullOrWhiteSpace(l))
-                            .Select(l => l.Trim().ToLowerInvariant())
-                            .ToArray();
-
-            if (lines.Length > 0)
+            // 2. Bypass check (Phase 18.5)
+            if (IsBypassed(hostName))
             {
-                ImmutableInterlocked.Update(ref _list, _ => ImmutableHashSet.CreateRange(StringComparer.OrdinalIgnoreCase, lines));
+                _logger.LogInformation("[Proxy] BYPASS: {Host}", hostName);
+                await RelayRawAsync(peekingStream, hostName, ct);
+                return;
             }
+
+            // 3. Terminate TLS with client
+            var serverOptions = new SslServerAuthenticationOptions
+            {
+                ServerCertificateSelectionCallback = (sender, host) =>
+                {
+                    return CertificateManager.GenerateHostCert(host ?? hostName);
+                },
+                EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
+                ClientCertificateRequired = false
+            };
+
+            using var clientSslStream = new SslStream(peekingStream, false);
+            await clientSslStream.AuthenticateAsServerAsync(serverOptions, ct);
+
+            // 4. Connect to upstream
+            using var upstreamClient = new TcpClient();
+            await upstreamClient.ConnectAsync(hostName, 443, ct);
+            using var upstreamStream = upstreamClient.GetStream();
+
+            using var upstreamSslStream = new SslStream(upstreamStream, false);
+            await upstreamSslStream.AuthenticateAsClientAsync(hostName);
+
+            // 5. Relay and Block (Phase 18.3)
+            await RelayWithInterceptionAsync(clientSslStream, upstreamSslStream, hostName, ct);
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"⚠️ AiLearnedBlocklist load failed: {ex.Message}");
-            ImmutableInterlocked.Update(ref _list, _ => ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase));
+            // Normal TCP teardown — peer reset/aborted. Log at Debug, not Error.
+            if (IsNormalDisconnect(ex))
+                _logger.LogDebug("[ProxyHandler] Connection closed by peer for {Host}", hostName ?? "unknown");
+            else
+                _logger.LogError(ex, "[ProxyHandler] Connection failed for {Host}", hostName ?? "unknown");
         }
     }
 
-    public static bool Contains(string domain)
+    private static bool IsNormalDisconnect(Exception ex)
     {
-        if (_permanentSafelist.Contains(domain)) return false;
-        if (AllowlistManager.Contains(domain)) return false;
-        return _list.Contains(domain);
+        var sockEx = ex as SocketException ?? (ex as IOException)?.InnerException as SocketException;
+        if (sockEx != null)
+        {
+            return sockEx.SocketErrorCode is SocketError.ConnectionReset
+                                          or SocketError.ConnectionAborted;
+        }
+        return ex is IOException or ObjectDisposedException;
     }
 
-    public static void Add(string domain)
+    private bool IsBypassed(string hostName)
     {
-        if (string.IsNullOrWhiteSpace(domain)) return;
-        var cleanDomain = domain.Trim().ToLowerInvariant();
-
-        if (_permanentSafelist.Contains(cleanDomain)) return;
-        if (AllowlistManager.Contains(cleanDomain)) return;
-
-        bool added = false;
-        ImmutableInterlocked.Update(ref _list, current =>
+        foreach (var pattern in HttpsProxyConfigManager.Settings.ProxyBypassDomains)
         {
-            if (current.Contains(cleanDomain))
+            if (string.Equals(hostName, pattern, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (pattern.StartsWith("*."))
             {
-                added = false;
-                return current;
+                string suffix = pattern.Substring(1);
+                if (hostName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                    return true;
             }
-            added = true;
-            return current.Add(cleanDomain);
-        });
-
-        if (added)
-        {
-            Save();
-            CollectionChanged?.Invoke();
         }
+        return false;
     }
 
-    public static void Remove(string domain)
+    private async Task RelayRawAsync(PeekableStream clientStream, string hostName, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(domain)) return;
-        var cleanDomain = domain.Trim().ToLowerInvariant();
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        using var upstreamClient = new TcpClient();
+        await upstreamClient.ConnectAsync(hostName, 443, cts.Token);
+        using var upstreamStream = upstreamClient.GetStream();
 
-        bool removed = false;
-        ImmutableInterlocked.Update(ref _list, current =>
-        {
-            if (!current.Contains(cleanDomain))
-            {
-                removed = false;
-                return current;
-            }
-            removed = true;
-            return current.Remove(cleanDomain);
-        });
+        // Use WhenAny: when one direction closes, cancel the other and tear down.
+        await Task.WhenAny(
+            CopySilentlyAsync(clientStream, upstreamStream, cts.Token),
+            CopySilentlyAsync(upstreamStream, clientStream, cts.Token));
 
-        if (removed)
-        {
-            Save();
-            CollectionChanged?.Invoke();
-        }
+        cts.Cancel();
+        upstreamClient.Close();
+        _client.Close();
     }
 
-    public static IReadOnlyList<string> GetAll()
-    {
-        return _list.OrderBy(d => d).ToList();
-    }
-
-    private static void Save()
+    // Copies bytes until the peer closes or a normal disconnect occurs. Exceptions from
+    // TCP teardown (IOException, SocketException, ObjectDisposedException) are swallowed.
+    private static async Task CopySilentlyAsync(Stream source, Stream destination, CancellationToken ct)
     {
         try
         {
-            if (!Directory.Exists(AppFolder))
+            await source.CopyToAsync(destination, ct);
+        }
+        catch (Exception ex) when (IsNormalDisconnect(ex) || ex is OperationCanceledException)
+        {
+            // Normal peer disconnect or cancellation — nothing to log.
+        }
+    }
+
+    private async Task RelayWithInterceptionAsync(SslStream clientStream, SslStream upstreamStream, string hostName, CancellationToken ct)
+    {
+        var clientToUpstream = InterceptRequestsAsync(clientStream, upstreamStream, hostName, ct);
+        var upstreamToClient = upstreamStream.CopyToAsync(clientStream, ct);
+
+        await Task.WhenAny(clientToUpstream, upstreamToClient);
+    }
+
+    private async Task InterceptRequestsAsync(Stream source, Stream destination, string hostName, CancellationToken ct)
+    {
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(16384);
+        try
+        {
+            while (!ct.IsCancellationRequested)
             {
-                Directory.CreateDirectory(AppFolder);
+                int bytesRead = await source.ReadAsync(buffer, 0, buffer.Length, ct);
+                if (bytesRead == 0) break;
+
+                // Simple HTTP Request Line extraction
+                string data = Encoding.UTF8.GetString(buffer, 0, Math.Min(bytesRead, 1024));
+                int lineEnd = data.IndexOf("\r\n");
+                if (lineEnd > 0)
+                {
+                    string requestLine = data.Substring(0, lineEnd);
+                    var parts = requestLine.Split(' ');
+                    if (parts.Length >= 2)
+                    {
+                        string method = parts[0];
+                        string url = parts[1];
+
+                        string path = url;
+                        string query = "";
+                        int queryIdx = url.IndexOf('?');
+                        if (queryIdx >= 0)
+                        {
+                            path = url.Substring(0, queryIdx);
+                            query = url.Substring(queryIdx + 1);
+                        }
+
+                        if (AdBlockingMiddleware.ShouldBlock(hostName, path, query))
+                        {
+                            MetricsManager.IncrementProxyAdsBlocked();
+                            _logger.LogInformation("[Proxy] BLOCKED: https://{Host}{Url}", hostName, url);
+                            byte[] response = AdBlockingMiddleware.GetBlockResponse(path);
+                            await source.WriteAsync(response, 0, response.Length, ct);
+                            await source.FlushAsync(ct);
+                            continue;
+                        }
+                    }
+                }
+
+                await destination.WriteAsync(buffer, 0, bytesRead, ct);
+                await destination.FlushAsync(ct);
             }
-            File.WriteAllLines(ListPath, _list.ToArray());
+        }
+        catch { }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
+    }
+
+    private async Task<string?> TryExtractSniAsync(PeekableStream stream, CancellationToken ct)
+    {
+        // We need to read the first 5 bytes to get record length
+        byte[] header = new byte[5];
+        if (await stream.PeekFullyAsync(header, ct) != 5) return null;
+
+        if (header[0] != 0x16) return null;
+
+        int recordLen = (header[3] << 8) | header[4];
+        byte[] record = new byte[recordLen];
+        if (await stream.PeekFullyAsync(record, ct, 5) != recordLen) return null;
+
+        // Skip handshake header (1 byte type, 3 bytes length)
+        // Handshake type 0x01 = ClientHello
+        if (record[0] != 0x01) return null;
+
+        try
+        {
+            int pos = 38; // Handshake header(4), Version(2), Random(32)
+            if (pos >= record.Length) return null;
+
+            int sessionIDLen = record[pos++];
+            pos += sessionIDLen;
+            if (pos >= record.Length) return null;
+
+            int cipherSuiteLen = (record[pos] << 8) | record[pos + 1];
+            pos += 2 + cipherSuiteLen;
+            if (pos >= record.Length) return null;
+
+            int compressionLen = record[pos++];
+            pos += compressionLen;
+            if (pos >= record.Length) return null;
+
+            if (pos + 2 > record.Length) return null;
+            int extensionsLen = (record[pos] << 8) | record[pos + 1];
+            pos += 2;
+
+            int end = pos + extensionsLen;
+            while (pos + 4 <= end && pos + 4 <= record.Length)
+            {
+                int extType = (record[pos] << 8) | record[pos + 1];
+                int extLen = (record[pos + 2] << 8) | record[pos + 3];
+                pos += 4;
+
+                if (extType == 0x00)
+                {
+                    if (pos + 2 > record.Length) return null;
+                    int listLen = (record[pos] << 8) | record[pos + 1];
+                    pos += 2;
+
+                    if (pos + 3 > record.Length) return null;
+                    int nameType = record[pos];
+                    int nameLen = (record[pos + 1] << 8) | record[pos + 2];
+                    pos += 3;
+
+                    if (nameType == 0x00 && pos + nameLen <= record.Length)
+                    {
+                        return Encoding.UTF8.GetString(record, pos, nameLen);
+                    }
+                }
+                pos += extLen;
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    private class PeekableStream : Stream
+    {
+        private readonly Stream _inner;
+        private readonly MemoryStream _peeked = new();
+        private long _peekedReadPos = 0;
+
+        public byte[] PeekedData => _peeked.ToArray();
+
+        public PeekableStream(Stream inner) => _inner = inner;
+
+        public async Task<int> PeekFullyAsync(byte[] buffer, CancellationToken ct, int offset = 0)
+        {
+            // This is a special peek that doesn't advance the logical stream position for the user
+            // but populates the internal buffer.
+
+            // If we already have enough data in peeked buffer at the specified offset
+            if (_peeked.Length >= offset + buffer.Length)
+            {
+                var data = _peeked.ToArray();
+                Buffer.BlockCopy(data, offset, buffer, 0, buffer.Length);
+                return buffer.Length;
+            }
+
+            // Read from inner to fill peeked buffer up to required length
+            int toRead = (offset + buffer.Length) - (int)_peeked.Length;
+            byte[] temp = new byte[toRead];
+            int read = await _inner.ReadAsync(temp, 0, toRead, ct);
+            if (read > 0)
+            {
+                _peeked.Write(temp, 0, read);
+            }
+
+            if (_peeked.Length >= offset + buffer.Length)
+            {
+                var data = _peeked.ToArray();
+                Buffer.BlockCopy(data, offset, buffer, 0, buffer.Length);
+                return buffer.Length;
+            }
+
+            return (int)_peeked.Length - offset;
+        }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (_peekedReadPos < _peeked.Length)
+            {
+                int toCopy = Math.Min(buffer.Length, (int)(_peeked.Length - _peekedReadPos));
+                _peeked.ToArray().AsMemory((int)_peekedReadPos, toCopy).CopyTo(buffer);
+                _peekedReadPos += toCopy;
+                return toCopy;
+            }
+
+            return await _inner.ReadAsync(buffer, cancellationToken);
+        }
+
+        // Standard Stream overrides
+        public override bool CanRead => _inner.CanRead;
+        public override bool CanSeek => false;
+        public override bool CanWrite => _inner.CanWrite;
+        public override long Length => _inner.Length;
+        public override long Position { get => _inner.Position; set => throw new NotSupportedException(); }
+        public override void Flush() => _inner.Flush();
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException("Use ReadAsync");
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => _inner.Write(buffer, offset, count);
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) => _inner.WriteAsync(buffer, offset, count, cancellationToken);
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Core/Proxy/TrafficRedirector.cs">
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
+
+namespace AegisDNS.Core.Proxy;
+
+/// <summary>
+/// Phase 18 — Traffic Redirector.
+/// Manages iptables rules to redirect HTTPS traffic to the local proxy.
+/// </summary>
+public static class TrafficRedirector
+{
+    private static bool _isEnabled;
+
+    public static bool IsEnabled() => _isEnabled;
+
+    public static void Enable(int proxyPort)
+    {
+        if (_isEnabled) return;
+
+        // Clean up any stale rules left from a previous crash before adding fresh ones.
+        Disable();
+
+        try
+        {
+            Debug.WriteLine($"[TrafficRedirector] Enabling redirection to port {proxyPort}...");
+
+            // 1. Skip loopback (so proxy can connect to upstream)
+            // -I OUTPUT 1 inserts at the top
+            RunIptables("-t", "nat", "-I", "OUTPUT", "1", "-p", "tcp", "--dport", "443", "-m", "owner", "--uid-owner", "0", "-j", "RETURN");
+
+            // 2. Redirect all other outbound 443 to local proxy
+            RunIptables("-t", "nat", "-A", "OUTPUT", "-p", "tcp", "--dport", "443", "-j", "REDIRECT", "--to-port", proxyPort.ToString());
+
+            _isEnabled = true;
+            Debug.WriteLine("[TrafficRedirector] HTTPS redirection active.");
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"❌ AiLearnedBlocklist save failed: {ex.Message}");
+            Debug.WriteLine($"[TrafficRedirector] Enable failed: {ex.Message}");
+            Disable(); // Cleanup any partial rules
         }
+    }
+
+    public static void Disable()
+    {
+        try
+        {
+            Debug.WriteLine("[TrafficRedirector] Disabling redirection...");
+
+            // Use -D to delete the exact rules we added. 
+            // We'll call it multiple times to be sure, and catch errors if rules don't exist.
+
+            // Delete the REDIRECT rule first
+            RunIptables("-t", "nat", "-D", "OUTPUT", "-p", "tcp", "--dport", "443", "-j", "REDIRECT", "--to-port", HttpsProxyConfigManager.Settings.ProxyPort.ToString());
+
+            // Delete the loopback RETURN rule
+            RunIptables("-t", "nat", "-D", "OUTPUT", "-p", "tcp", "--dport", "443", "-m", "owner", "--uid-owner", "0", "-j", "RETURN");
+
+            _isEnabled = false;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[TrafficRedirector] Disable error (non-fatal): {ex.Message}");
+        }
+    }
+
+    private static void RunIptables(params string[] args)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+
+        try
+        {
+            // Note: Service has CAP_NET_ADMIN so this should work without pkexec if running as service.
+            // If running in dev mode, it might need pkexec.
+            string cmd = "iptables";
+
+            var psi = new ProcessStartInfo(cmd)
+            {
+                CreateNoWindow = true,
+                UseShellExecute = false
+            };
+
+            foreach (var arg in args)
+                psi.ArgumentList.Add(arg);
+
+            using var process = Process.Start(psi);
+            process?.WaitForExit(5000);
+
+            if (process?.ExitCode != 0)
+            {
+                Debug.WriteLine($"[TrafficRedirector] iptables {string.Join(" ", args)} returned {process?.ExitCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[TrafficRedirector] iptables execution failed: {ex.Message}");
+        }
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Core/Security/CertificateManager.cs">
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Threading.Tasks;
+
+using AegisDNS.Licensing;
+
+namespace AegisDNS.Core.Security;
+
+/// <summary>
+/// Phase 18 — Local CA Certificate Manager.
+/// Manages the generation and installation of the local root CA used for HTTPS interception.
+/// Also handles dynamic generation of per-host ECDSA P-256 certificates.
+/// </summary>
+public static class CertificateManager
+{
+    private static readonly string CaDir = Path.Combine(
+        "/var/lib/aegisdns", "ca");
+
+    private static readonly string PfxPath = Path.Combine(CaDir, "aegisdns-ca.pfx");
+    private static readonly string PemPath = Path.Combine(CaDir, "aegisdns-ca.pem");
+    private static readonly string PassphrasePath = Path.Combine(CaDir, "ca.key.token");
+
+    private static readonly ConcurrentDictionary<string, (X509Certificate2 Cert, DateTime Expiry)> _certCache = new();
+
+    private static X509Certificate2? _caCert;
+
+    static CertificateManager()
+    {
+        if (!Directory.Exists(CaDir))
+            Directory.CreateDirectory(CaDir);
+    }
+
+    /// <summary>
+    /// Gets or generates the local CA certificate.
+    /// </summary>
+    public static X509Certificate2 GetOrGenerateCa()
+    {
+        if (_caCert != null) return _caCert;
+
+        if (File.Exists(PfxPath))
+        {
+            try
+            {
+                string? passphrase = AesGcmTokenStore.Decrypt(PassphrasePath);
+                if (passphrase != null)
+                {
+                    _caCert = X509CertificateLoader.LoadPkcs12FromFile(PfxPath, passphrase, X509KeyStorageFlags.Exportable);
+                    return _caCert;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[CertificateManager] Failed to load CA: {ex.Message}");
+            }
+        }
+
+        return GenerateCa();
+    }
+
+    private static X509Certificate2 GenerateCa()
+    {
+        Debug.WriteLine("[CertificateManager] Generating new Local CA...");
+
+        using var rsa = RSA.Create(2048);
+        var request = new CertificateRequest(
+            "CN=AegisDNS Local CA, O=AegisDNS",
+            rsa,
+            HashAlgorithmName.SHA256,
+            RSASignaturePadding.Pkcs1);
+
+        request.CertificateExtensions.Add(
+            new X509BasicConstraintsExtension(true, false, 0, true));
+
+        request.CertificateExtensions.Add(
+            new X509KeyUsageExtension(
+                X509KeyUsageFlags.KeyCertSign | X509KeyUsageFlags.CrlSign,
+                true));
+
+        var notBefore = DateTimeOffset.UtcNow.AddDays(-1);
+        var notAfter = notBefore.AddYears(10);
+
+        var cert = request.CreateSelfSigned(notBefore, notAfter);
+
+        // Export with a random passphrase
+        string passphrase = Guid.NewGuid().ToString("N");
+        byte[] pfxData = cert.Export(X509ContentType.Pfx, passphrase);
+
+        File.WriteAllBytes(PfxPath, pfxData);
+        if (OperatingSystem.IsLinux())
+            File.SetUnixFileMode(PfxPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+
+        // Store passphrase securely
+        AesGcmTokenStore.Encrypt(passphrase, PassphrasePath);
+
+        // Export public PEM for trust store installation
+        string pem = cert.ExportCertificatePem();
+        File.WriteAllText(PemPath, pem);
+        if (OperatingSystem.IsLinux())
+            File.SetUnixFileMode(PemPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+
+        _caCert = X509CertificateLoader.LoadPkcs12(pfxData, passphrase, X509KeyStorageFlags.Exportable);
+        return _caCert;
+    }
+
+    /// <summary>
+    /// Installs the CA certificate into the system trust store using pkexec for elevation.
+    /// </summary>
+    public static async Task<bool> InstallCaCertAsync()
+    {
+        if (!File.Exists(PemPath)) GetOrGenerateCa();
+
+        return await Task.Run(() =>
+        {
+            try
+            {
+                string targetPath = "/usr/local/share/ca-certificates/aegisdns-ca.crt";
+                string updateCmd = "update-ca-certificates";
+
+                // Check for Fedora/RHEL path
+                if (Directory.Exists("/etc/pki/ca-trust/source/anchors/"))
+                {
+                    targetPath = "/etc/pki/ca-trust/source/anchors/aegisdns-ca.crt";
+                    updateCmd = "update-ca-trust";
+                }
+
+                var psi = new ProcessStartInfo("pkexec")
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                // Use 'sh -c' to combine commands under sudo/pkexec
+                psi.ArgumentList.Add("sh");
+                psi.ArgumentList.Add("-c");
+                // Install PEM into trust store, then fix permissions on CA dir so both
+                // root (service) and the UI user (uid 1000) can read pfx/token.
+                psi.ArgumentList.Add(
+                    $"cp \"{PemPath}\" \"{targetPath}\" && {updateCmd} && " +
+                    $"chmod 755 \"{CaDir}\" && " +
+                    $"chmod 644 \"{PemPath}\" && " +
+                    $"chmod 640 \"{PfxPath}\" && chmod 640 \"{PassphrasePath}\" && " +
+                    $"chown root:aegisdns \"{PfxPath}\" \"{PassphrasePath}\" 2>/dev/null || true");
+
+                var process = Process.Start(psi);
+                process?.WaitForExit();
+
+                return process?.ExitCode == 0;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[CertificateManager] Installation failed: {ex.Message}");
+                return false;
+            }
+        });
+    }
+
+    /// <summary>
+    /// Removes the CA certificate from the system trust store.
+    /// </summary>
+    public static async Task<bool> RemoveCaCertAsync()
+    {
+        return await Task.Run(() =>
+        {
+            try
+            {
+                string targetPath = "/usr/local/share/ca-certificates/aegisdns-ca.crt";
+                string updateCmd = "update-ca-certificates";
+
+                if (File.Exists("/etc/pki/ca-trust/source/anchors/aegisdns-ca.crt"))
+                {
+                    targetPath = "/etc/pki/ca-trust/source/anchors/aegisdns-ca.crt";
+                    updateCmd = "update-ca-trust";
+                }
+
+                var psi = new ProcessStartInfo("pkexec")
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                psi.ArgumentList.Add("sh");
+                psi.ArgumentList.Add("-c");
+                psi.ArgumentList.Add($"rm -f \"{targetPath}\" && {updateCmd}");
+
+                var process = Process.Start(psi);
+                process?.WaitForExit();
+
+                return process?.ExitCode == 0;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[CertificateManager] Removal failed: {ex.Message}");
+                return false;
+            }
+        });
+    }
+
+    /// <summary>
+    /// Generates a short-lived RSA 2048 certificate for the specified hostname.
+    /// Signed by the local CA.
+    /// </summary>
+    public static X509Certificate2 GenerateHostCert(string hostname)
+    {
+        if (_certCache.TryGetValue(hostname, out var cached) && cached.Expiry > DateTime.UtcNow.AddMinutes(5))
+        {
+            return cached.Cert;
+        }
+
+        var ca = GetOrGenerateCa();
+
+        using var rsa = RSA.Create(2048);
+        var request = new CertificateRequest(
+            $"CN={hostname}",
+            rsa,
+            HashAlgorithmName.SHA256,
+            RSASignaturePadding.Pkcs1);
+
+        var sanBuilder = new SubjectAlternativeNameBuilder();
+        sanBuilder.AddDnsName(hostname);
+        request.CertificateExtensions.Add(sanBuilder.Build());
+
+        // Host certs are NOT CAs
+        request.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, true));
+
+        // Key usage for TLS server
+        request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, true));
+        request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(
+            new OidCollection { new Oid("1.3.6.1.5.5.7.3.1") }, // Server Auth
+            false));
+
+        var notBefore = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var notAfter = notBefore.AddHours(24);
+
+        // Serial number generation (must be positive)
+        byte[] serialNumber = new byte[8];
+        RandomNumberGenerator.Fill(serialNumber);
+        serialNumber[0] &= 0x7F; // Ensure positive
+
+        // Sign with CA
+        using var hostCert = request.Create(ca, notBefore, notAfter, serialNumber);
+
+        // We MUST associate the private key with the certificate for SslStream to use it.
+        var certWithKey = hostCert.CopyWithPrivateKey(rsa);
+
+        _certCache[hostname] = (certWithKey, notAfter.UtcDateTime);
+        return certWithKey;
+    }
+
+    /// <summary>
+    /// Checks if the CA certificate is installed in the system trust store.
+    /// </summary>
+    public static bool IsCaInstalled()
+    {
+        if (File.Exists("/usr/local/share/ca-certificates/aegisdns-ca.crt")) return true;
+        if (File.Exists("/etc/pki/ca-trust/source/anchors/aegisdns-ca.crt")) return true;
+
+        return false;
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Core/Utilities/BlocklistManager.cs">
+using System;
+using System.Collections.Generic;
+using System.Runtime.Versioning;
+using System.Threading.Tasks;
+
+using AegisDNS.Core;
+using AegisDNS.Licensing;
+
+namespace AegisDNS.Core;
+
+/// <summary>
+/// High-level façade over BlocklistUpdater.
+/// Selects the correct Hagezi blocklist URLs based on license tier and settings.
+/// </summary>
+public class BlocklistManager
+{
+    private readonly BlocklistUpdater _updater = new();
+
+    /// <summary>
+    /// Fetches and parses the appropriate blocklists based on license tier and settings.
+    /// </summary>
+    public async Task<IEnumerable<string>> FetchAndParseAsync(Func<string, Task>? logger = null)
+    {
+        var urls = GetActiveBlocklistUrls();
+
+        // Bridge async logger to sync Action for BlocklistUpdater
+        Action<string>? syncLogger = logger != null
+            ? msg => logger(msg).ConfigureAwait(false)
+            : null;
+
+        var domains = new List<string>(await _updater.UpdateMultipleAsync(urls, syncLogger));
+
+        // Inject embedded gaming launcher domains (no network fetch — built in)
+        if (BlocklistConfigManager.Settings.EnableGamingLauncherBlocking)
+        {
+            domains.AddRange(GamingLauncherDomains.GetAll());
+            syncLogger?.Invoke("🎮 Gaming launcher ad domains loaded.");
+        }
+
+        return domains;
+    }
+
+    /// <summary>
+    /// Returns the currently active blocklist URLs based on license and settings.
+    /// </summary>
+    public static List<string> GetActiveBlocklistUrls()
+    {
+        var urls = new List<string>();
+
+        // 1. Determine Tier-based Primary List
+#pragma warning disable CA1416
+        LicenseManager.LicenseTier tier = LicenseManager.LicenseTier.Community;
+
+#if DEBUG
+        // Force highest tier for developer testing
+        tier = LicenseManager.LicenseTier.Enterprise;
+#endif
+
+        string primaryList = tier switch
+        {
+            LicenseManager.LicenseTier.Pro or
+            LicenseManager.LicenseTier.AegisPrime or
+            LicenseManager.LicenseTier.Enterprise or
+            LicenseManager.LicenseTier.Founder or
+            LicenseManager.LicenseTier.Developer => HageziBlocklists.ProPlus,
+            _ => HageziBlocklists.Normal
+        };
+#pragma warning restore CA1416
+        urls.Add(primaryList);
+
+        // 2. Add-on Lists based on User Settings
+        var s = BlocklistConfigManager.Settings;
+        if (s.EnableThreatIntelligence) urls.Add(HageziBlocklists.ThreatIntelligence);
+        if (s.EnableFakeBlocking) urls.Add(HageziBlocklists.Fake);
+        if (s.EnablePopUpAdsBlocking) urls.Add(HageziBlocklists.PopUpAds);
+        if (s.EnableDynamicDnsBlocking) urls.Add(HageziBlocklists.DynamicDns);
+        if (s.EnableNrdBlocking) urls.Add(HageziBlocklists.NewlyRegisteredDomains);
+        if (s.EnableGamblingBlocking) urls.Add(HageziBlocklists.Gambling);
+        if (s.BlockAdultContent) urls.Add(HageziBlocklists.Nsfw);
+
+        return urls;
+    }
+
+    /// <summary>
+    /// Returns the currently selected primary blocklist URL (Legacy Support).
+    /// </summary>
+    [Obsolete("Use GetActiveBlocklistUrls instead.")]
+    public static string GetActiveUrl()
+    {
+        var urls = GetActiveBlocklistUrls();
+        return urls.Count > 0 ? urls[0] : string.Empty;
     }
 }
 </file>
@@ -7837,6 +7748,165 @@ public sealed class DevicePolicyEngine
 }
 </file>
 
+<file path="src/AegisDNS.Core/Utilities/AiLearnedBlocklist.cs">
+using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.IO;
+using System.Linq;
+
+namespace AegisDNS.Core.Utilities;
+
+public static class AiLearnedBlocklist
+{
+    private static readonly string AppFolder = Path.Combine(
+        Environment.GetEnvironmentVariable("XDG_DATA_HOME")
+            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share", "aegisdns"),
+        "AegisDNS");
+    private static readonly string ListPath = Path.Combine(AppFolder, "ai_learned.blocklist");
+
+    private static ImmutableHashSet<string> _list = ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly ImmutableHashSet<string> _permanentSafelist =
+        ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase,
+            "google.com", "www.google.com", "mail.google.com", "accounts.google.com",
+            "googleapis.com", "gstatic.com",
+            "youtube.com", "www.youtube.com", "youtu.be", "ytimg.com",
+            "sync-v2.brave.com", "collector.wdp.brave.com", "brave.com",
+            "claude.ai", "anthropic.com",
+            "microsoft.com", "live.com", "outlook.com", "office.com",
+            "apple.com", "icloud.com",
+            "github.com", "githubusercontent.com",
+            "cloudflare.com", "cdn.jsdelivr.net", "cdnjs.cloudflare.com",
+            "gitlab.com",
+            "dropbox.com", "dropboxapi.com",
+            "cline.bot",
+            "sonarr.tv",
+            "thexem.info",
+            "antigravity-unleash.goog",
+            "duckdns.org",
+            "googleusercontent.com",
+            "openai.com",
+            "flathub.org",
+            "exp-tas.com"
+        );
+
+    private static bool IsPermSafelisted(string domain) =>
+        _permanentSafelist.Contains(domain) ||
+        _permanentSafelist.Any(entry => domain.EndsWith("." + entry, StringComparison.OrdinalIgnoreCase));
+
+    public static event Action? CollectionChanged;
+
+    public static int Count => _list.Count;
+
+    public static void Load()
+    {
+        try
+        {
+            if (!File.Exists(ListPath))
+            {
+                ImmutableInterlocked.Update(ref _list, _ => ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase));
+                return;
+            }
+
+            var lines = File.ReadAllLines(ListPath)
+                            .Where(l => !string.IsNullOrWhiteSpace(l))
+                            .Select(l => l.Trim().ToLowerInvariant())
+                            .ToArray();
+
+            if (lines.Length > 0)
+            {
+                ImmutableInterlocked.Update(ref _list, _ => ImmutableHashSet.CreateRange(StringComparer.OrdinalIgnoreCase, lines));
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"⚠️ AiLearnedBlocklist load failed: {ex.Message}");
+            ImmutableInterlocked.Update(ref _list, _ => ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase));
+        }
+    }
+
+    public static bool Contains(string domain)
+    {
+        if (IsPermSafelisted(domain)) return false;
+        if (AllowlistManager.Contains(domain)) return false;
+        return _list.Contains(domain);
+    }
+
+    public static void Add(string domain)
+    {
+        if (string.IsNullOrWhiteSpace(domain)) return;
+        var cleanDomain = domain.Trim().ToLowerInvariant();
+
+        if (IsPermSafelisted(cleanDomain)) return;
+        if (AllowlistManager.Contains(cleanDomain)) return;
+
+        bool added = false;
+        ImmutableInterlocked.Update(ref _list, current =>
+        {
+            if (current.Contains(cleanDomain))
+            {
+                added = false;
+                return current;
+            }
+            added = true;
+            return current.Add(cleanDomain);
+        });
+
+        if (added)
+        {
+            Save();
+            CollectionChanged?.Invoke();
+        }
+    }
+
+    public static void Remove(string domain)
+    {
+        if (string.IsNullOrWhiteSpace(domain)) return;
+        var cleanDomain = domain.Trim().ToLowerInvariant();
+
+        bool removed = false;
+        ImmutableInterlocked.Update(ref _list, current =>
+        {
+            if (!current.Contains(cleanDomain))
+            {
+                removed = false;
+                return current;
+            }
+            removed = true;
+            return current.Remove(cleanDomain);
+        });
+
+        if (removed)
+        {
+            Save();
+            CollectionChanged?.Invoke();
+        }
+    }
+
+    public static IReadOnlyList<string> GetAll()
+    {
+        return _list.OrderBy(d => d).ToList();
+    }
+
+    private static void Save()
+    {
+        try
+        {
+            if (!Directory.Exists(AppFolder))
+            {
+                Directory.CreateDirectory(AppFolder);
+            }
+            File.WriteAllLines(ListPath, _list.ToArray());
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ AiLearnedBlocklist save failed: {ex.Message}");
+        }
+    }
+}
+</file>
+
 <file path="src/AegisDNS.Core/Utilities/UpdateManager.cs">
 using System;
 using System.Diagnostics;
@@ -8050,192 +8120,6 @@ public class UpdateManager
         {
             _logger.LogError(ex, "[UpdateManager] Verification error.");
             return false;
-        }
-    }
-}
-</file>
-
-<file path="src/AegisDNS.Core/Utilities/ConfigManager.cs">
-using System;
-using System.IO;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
-namespace AegisDNS.Core;
-
-public enum UpstreamMode { Udp, DoH, DoT }
-public enum LinuxDnsMethod { Resolvectl, ResolvConf, Auto }
-
-[JsonSerializable(typeof(AppSettings))]
-internal partial class AppConfigJsonContext : JsonSerializerContext
-{
-}
-
-public class AppSettings
-{
-    public bool StartOnBoot { get; set; } = false;
-    public bool StartMinimized { get; set; } = false;
-    public bool MinimizeToTray { get; set; } = true;
-    public bool EnableNeonGlow { get; set; } = true;
-    public bool ShowTrafficPreview { get; set; } = true;
-    public bool AutoUpdateBlocklists { get; set; } = true;
-    public bool LogDnsRequests { get; set; } = true;
-
-    // Pro-level customizations
-    public string AccentColor { get; set; } = "#00FFFF"; // Custom Neon Cyan
-    public int CacheSize { get; set; } = 1024;           // DNS Cache size in MB
-    public bool StealthMode { get; set; } = false;       // Hide from taskbar/tray
-    public string UpstreamPreset { get; set; } = "Google"; // Google, Cloudflare, OpenDNS
-    public bool TelemetryOptIn { get; set; } = false;    // Explicit consent for AegisDNS telemetry
-
-    // Phase 10 — AI Intelligence Layer
-    public bool EnableWeeklySummary { get; set; } = true;  // Show weekly report on launch
-    public bool EnableDailySummary { get; set; } = true;   // Show daily briefing on launch
-
-    // Phase 10B — VFX & Appearance Engine
-
-    // Glow
-    public double GlowIntensity { get; set; } = 0.8;        // 0.0 - 1.0
-    public double GlowRadius { get; set; } = 12.0;           // pixels
-    public string GlowColor { get; set; } = "#00FFFF";       // hex
-
-    // Background effects
-    public string BackgroundEffect { get; set; } = "None";   // "None" | "DataStream" | "NetworkNodes" | "PulseWave"
-    public bool CrtModeEnabled { get; set; } = false;
-
-    // Window material
-    public string WindowBackdrop { get; set; } = "Solid";    // "Solid" | "Acrylic" | "Mica"
-    public double BackgroundOpacity { get; set; } = 1.0;     // 0.4 - 1.0
-
-    // Accent gradient
-    public string AccentColorPrimary { get; set; } = "#00FFFF";
-    public string AccentColorSecondary { get; set; } = "#0080FF";
-
-    // Typography
-    public string LogFontFamily { get; set; } = "Consolas";
-    public bool StrictMonospaceLog { get; set; } = true;
-
-    // Audio
-    public string AudioPack { get; set; } = "Muted";         // "Muted" | "SciFiTerminal" | "MinimalistClicks"
-    public bool ThreatAlertSound { get; set; } = false;
-
-    // Theme profiles
-    public string ActiveThemeName { get; set; } = "Default";
-}
-
-public static class ConfigManager
-{
-    // Config lives unconditionally at /var/lib/aegisdns — avoids SELinux
-    // config_home_t restrictions that block service-side writes under btrfs.
-    public static readonly string AppFolder = "/var/lib/aegisdns";
-    private static readonly string ConfigPath = Path.Combine(AppFolder, "user_config.json");
-
-    public static AppSettings Settings { get; private set; } = new();
-
-    private static string ResolveHomeDir()
-    {
-        string? aegisUiUser = Environment.GetEnvironmentVariable("AEGIS_UI_USER");
-        if (!string.IsNullOrWhiteSpace(aegisUiUser))
-            return Path.Combine("/home", aegisUiUser);
-        return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-    }
-
-    static ConfigManager()
-    {
-        Console.Error.WriteLine($"[AegisDNS] Config base: {AppFolder}");
-        Load();
-    }
-
-    public static void Load()
-    {
-        // Migrate from old ~/.config/AegisDNS/ path if new path has no config yet
-        string homeConfigPath = Path.Combine(ResolveHomeDir(), ".config", "AegisDNS", "user_config.json");
-        if (!File.Exists(ConfigPath) && File.Exists(homeConfigPath))
-        {
-            try
-            {
-                if (!Directory.Exists(AppFolder)) Directory.CreateDirectory(AppFolder);
-                File.Copy(homeConfigPath, ConfigPath);
-                System.Diagnostics.Debug.WriteLine($"Migrated config from {homeConfigPath}");
-            }
-            catch { }
-        }
-
-        // Migrate from legacy ~/Documents/AegisDNS/user_config.json
-        string documentsLegacyPath = Path.Combine(ResolveHomeDir(), "Documents", "AegisDNS", "user_config.json");
-        if (!File.Exists(ConfigPath) && File.Exists(documentsLegacyPath))
-        {
-            try
-            {
-                if (!Directory.Exists(AppFolder)) Directory.CreateDirectory(AppFolder);
-                File.Copy(documentsLegacyPath, ConfigPath);
-                System.Diagnostics.Debug.WriteLine("Migrated config from ~/Documents/AegisDNS/");
-            }
-            catch { }
-        }
-
-        try
-        {
-            if (!File.Exists(ConfigPath))
-            {
-                Save();
-                return;
-            }
-
-            string json = File.ReadAllText(ConfigPath);
-
-            if (string.IsNullOrWhiteSpace(json))
-            {
-                Settings = new AppSettings();
-                return;
-            }
-
-            var loadedSettings = JsonSerializer.Deserialize(json, AppConfigJsonContext.Default.AppSettings);
-
-            if (loadedSettings != null)
-            {
-                Settings = loadedSettings;
-                System.Diagnostics.Debug.WriteLine($"Config loaded successfully from {ConfigPath}");
-            }
-        }
-        catch (JsonException ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Config JSON invalid: {ex.Message}. Resetting to defaults.");
-            Settings = new AppSettings();
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Load failed: {ex.Message}. Resetting to defaults.");
-            Settings = new AppSettings();
-        }
-    }
-
-    public static event Action? SettingsChanged;
-
-    public static void Save()
-    {
-        try
-        {
-            if (!Directory.Exists(AppFolder))
-            {
-                Directory.CreateDirectory(AppFolder);
-            }
-
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            string json = JsonSerializer.Serialize(Settings, typeof(AppSettings), new AppConfigJsonContext(options));
-
-            File.WriteAllText(ConfigPath, json);
-            if (OperatingSystem.IsLinux())
-            {
-                File.SetUnixFileMode(ConfigPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-            }
-
-            System.Diagnostics.Debug.WriteLine($"Config saved successfully to {ConfigPath}");
-            SettingsChanged?.Invoke();
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Save failed: {ex.Message}");
         }
     }
 }
@@ -8740,6 +8624,192 @@ public static class IpcSystem
                 System.Diagnostics.Debug.WriteLine($"[IPC] Warning: Incoming message exceeded {limit} bytes. Connection closed.");
                 throw new InvalidDataException("Message size limit exceeded.");
             }
+        }
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Core/Utilities/ConfigManager.cs">
+using System;
+using System.IO;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace AegisDNS.Core;
+
+public enum UpstreamMode { Udp, DoH, DoT }
+public enum LinuxDnsMethod { Resolvectl, ResolvConf, Auto }
+
+[JsonSerializable(typeof(AppSettings))]
+internal partial class AppConfigJsonContext : JsonSerializerContext
+{
+}
+
+public class AppSettings
+{
+    public bool StartOnBoot { get; set; } = false;
+    public bool StartMinimized { get; set; } = false;
+    public bool MinimizeToTray { get; set; } = true;
+    public bool EnableNeonGlow { get; set; } = true;
+    public bool ShowTrafficPreview { get; set; } = true;
+    public bool AutoUpdateBlocklists { get; set; } = true;
+    public bool LogDnsRequests { get; set; } = true;
+
+    // Pro-level customizations
+    public string AccentColor { get; set; } = "#00FFFF"; // Custom Neon Cyan
+    public int CacheSize { get; set; } = 1024;           // DNS Cache size in MB
+    public bool StealthMode { get; set; } = false;       // Hide from taskbar/tray
+    public string UpstreamPreset { get; set; } = "Google"; // Google, Cloudflare, OpenDNS
+    public bool TelemetryOptIn { get; set; } = false;    // Explicit consent for AegisDNS telemetry
+
+    // Phase 10 — AI Intelligence Layer
+    public bool EnableWeeklySummary { get; set; } = true;  // Show weekly report on launch
+    public bool EnableDailySummary { get; set; } = true;   // Show daily briefing on launch
+
+    // Phase 10B — VFX & Appearance Engine
+
+    // Glow
+    public double GlowIntensity { get; set; } = 0.8;        // 0.0 - 1.0
+    public double GlowRadius { get; set; } = 12.0;           // pixels
+    public string GlowColor { get; set; } = "#00FFFF";       // hex
+
+    // Background effects
+    public string BackgroundEffect { get; set; } = "None";   // "None" | "DataStream" | "NetworkNodes" | "PulseWave"
+    public bool CrtModeEnabled { get; set; } = false;
+
+    // Window material
+    public string WindowBackdrop { get; set; } = "Solid";    // "Solid" | "Acrylic" | "Mica"
+    public double BackgroundOpacity { get; set; } = 1.0;     // 0.4 - 1.0
+
+    // Accent gradient
+    public string AccentColorPrimary { get; set; } = "#00FFFF";
+    public string AccentColorSecondary { get; set; } = "#0080FF";
+
+    // Typography
+    public string LogFontFamily { get; set; } = "Consolas";
+    public bool StrictMonospaceLog { get; set; } = true;
+
+    // Audio
+    public string AudioPack { get; set; } = "Muted";         // "Muted" | "SciFiTerminal" | "MinimalistClicks"
+    public bool ThreatAlertSound { get; set; } = false;
+
+    // Theme profiles
+    public string ActiveThemeName { get; set; } = "Default";
+}
+
+public static class ConfigManager
+{
+    // Config lives unconditionally at /var/lib/aegisdns — avoids SELinux
+    // config_home_t restrictions that block service-side writes under btrfs.
+    public static readonly string AppFolder = "/var/lib/aegisdns";
+    private static readonly string ConfigPath = Path.Combine(AppFolder, "user_config.json");
+
+    public static AppSettings Settings { get; private set; } = new();
+
+    private static string ResolveHomeDir()
+    {
+        string? aegisUiUser = Environment.GetEnvironmentVariable("AEGIS_UI_USER");
+        if (!string.IsNullOrWhiteSpace(aegisUiUser))
+            return Path.Combine("/home", aegisUiUser);
+        return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    }
+
+    static ConfigManager()
+    {
+        Console.Error.WriteLine($"[AegisDNS] Config base: {AppFolder}");
+        Load();
+    }
+
+    public static void Load()
+    {
+        // Migrate from old ~/.config/AegisDNS/ path if new path has no config yet
+        string homeConfigPath = Path.Combine(ResolveHomeDir(), ".config", "AegisDNS", "user_config.json");
+        if (!File.Exists(ConfigPath) && File.Exists(homeConfigPath))
+        {
+            try
+            {
+                if (!Directory.Exists(AppFolder)) Directory.CreateDirectory(AppFolder);
+                File.Copy(homeConfigPath, ConfigPath);
+                System.Diagnostics.Debug.WriteLine($"Migrated config from {homeConfigPath}");
+            }
+            catch { }
+        }
+
+        // Migrate from legacy ~/Documents/AegisDNS/user_config.json
+        string documentsLegacyPath = Path.Combine(ResolveHomeDir(), "Documents", "AegisDNS", "user_config.json");
+        if (!File.Exists(ConfigPath) && File.Exists(documentsLegacyPath))
+        {
+            try
+            {
+                if (!Directory.Exists(AppFolder)) Directory.CreateDirectory(AppFolder);
+                File.Copy(documentsLegacyPath, ConfigPath);
+                System.Diagnostics.Debug.WriteLine("Migrated config from ~/Documents/AegisDNS/");
+            }
+            catch { }
+        }
+
+        try
+        {
+            if (!File.Exists(ConfigPath))
+            {
+                Save();
+                return;
+            }
+
+            string json = File.ReadAllText(ConfigPath);
+
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                Settings = new AppSettings();
+                return;
+            }
+
+            var loadedSettings = JsonSerializer.Deserialize(json, AppConfigJsonContext.Default.AppSettings);
+
+            if (loadedSettings != null)
+            {
+                Settings = loadedSettings;
+                System.Diagnostics.Debug.WriteLine($"Config loaded successfully from {ConfigPath}");
+            }
+        }
+        catch (JsonException ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Config JSON invalid: {ex.Message}. Resetting to defaults.");
+            Settings = new AppSettings();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Load failed: {ex.Message}. Resetting to defaults.");
+            Settings = new AppSettings();
+        }
+    }
+
+    public static event Action? SettingsChanged;
+
+    public static void Save()
+    {
+        try
+        {
+            if (!Directory.Exists(AppFolder))
+            {
+                Directory.CreateDirectory(AppFolder);
+            }
+
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string json = JsonSerializer.Serialize(Settings, typeof(AppSettings), new AppConfigJsonContext(options));
+
+            File.WriteAllText(ConfigPath, json);
+            if (OperatingSystem.IsLinux())
+            {
+                File.SetUnixFileMode(ConfigPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
+
+            System.Diagnostics.Debug.WriteLine($"Config saved successfully to {ConfigPath}");
+            SettingsChanged?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Save failed: {ex.Message}");
         }
     }
 }

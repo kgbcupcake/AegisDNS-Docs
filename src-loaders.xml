@@ -1,4 +1,4 @@
-This file is a merged representation of a subset of the codebase, containing specifically included files, combined into a single document by Repomix.
+This file is a merged representation of a subset of the codebase, containing specifically included files and files not matching ignore patterns, combined into a single document by Repomix.
 
 <file_summary>
 This section contains a summary of this file.
@@ -32,7 +32,8 @@ The content is organized as follows:
 <notes>
 - Some files may have been excluded based on .gitignore rules and Repomix's configuration
 - Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
-- Only files matching these patterns are included: src/AegisDNS.BpfLoader/**/*.cs, src/AegisDNS.XdpLoader/**/*.cs
+- Only files matching these patterns are included: src/AegisDNS.BpfLoader/**/*.cs, src/AegisDNS.XdpLoader/**/*.cs, src/AegisDNS.XdpLoader/xdp/*.c
+- Files matching these patterns are excluded: obj/**, bin/**, *.user, *.suo, *.DotSettings, *.lock, node_modules/**
 - Files matching patterns in .gitignore are excluded
 - Files matching default ignore patterns are excluded
 - Files are sorted by Git change count (files with more changes are at the bottom)
@@ -47,6 +48,8 @@ src/
     BpfStructs.cs
     LibBpf.cs
   AegisDNS.XdpLoader/
+    xdp/
+      aegis_xdp.c
     AegisXdpLoader.cs
     LibXdp.cs
     XdpMode.cs
@@ -55,6 +58,268 @@ src/
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="src/AegisDNS.XdpLoader/xdp/aegis_xdp.c">
+// SPDX-License-Identifier: GPL-2.0
+// AegisDNS XDP Ingress Shield — Phase 15
+// Inspects incoming DNS responses at the NIC driver level.
+// Drops: spoofed IPs, RFC1918 rebinding attacks, malformed DNS packets.
+
+#include <linux/bpf.h>
+#include <linux/if_ether.h>
+#include <linux/in.h>
+#include <linux/ip.h>
+#include <linux/udp.h>
+#include <bpf/bpf_helpers.h>
+#include <bpf/bpf_endian.h>
+
+// ── Event struct — mirrored in XdpStructs.cs ────────────────────────────────
+struct aegis_xdp_event {
+    __u32 src_ip;
+    __u16 dns_txid;
+    __u8  reason;
+    __u8  pad;      /* explicit padding — do not remove */
+};
+
+// ── Reason codes ────────────────────────────────────────────────────────────
+#define REASON_BLOCKED_IP     0x01
+#define REASON_RFC1918_REBIND 0x02
+#define REASON_MALFORMED      0x03
+
+// ── BPF Maps ────────────────────────────────────────────────────────────────
+
+// Blocked source IPs — populated by AegisXdpLoader.AddBlockedIp()
+struct {
+    __uint(type, BPF_MAP_TYPE_LRU_HASH);
+    __uint(max_entries, 65536);
+    __type(key, __u32);    // IPv4 source IP (network byte order)
+    __type(value, __u8);   // reason code
+} xdp_blocked_ips SEC(".maps");
+
+// Ring buffer for drop events → consumed by AegisXdpLoader.cs
+struct {
+    __uint(type, BPF_MAP_TYPE_RINGBUF);
+    __uint(max_entries, 262144); // 256KB
+} xdp_events SEC(".maps");
+
+// Per-CPU drop counter — read by AegisXdpLoader.GetDropCount()
+struct {
+    __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+    __uint(max_entries, 1);
+    __type(key, __u32);
+    __type(value, __u64);
+} xdp_drop_counter SEC(".maps");
+
+// ── Helper: emit drop event + increment counter ─────────────────────────────
+static __always_inline void emit_drop(
+    __u32 src_ip, __u16 dns_txid, __u8 reason)
+{
+    // Increment per-CPU drop counter
+    __u32 key = 0;
+    __u64 *count = bpf_map_lookup_elem(&xdp_drop_counter, &key);
+    if (count)
+        __sync_fetch_and_add(count, 1);
+
+    // Emit event to ring buffer
+    struct aegis_xdp_event *evt;
+    evt = bpf_ringbuf_reserve(&xdp_events, sizeof(*evt), 0);
+    if (evt) {
+        evt->src_ip   = src_ip;
+        evt->dns_txid = dns_txid;
+        evt->reason   = reason;
+        evt->pad      = 0;
+        bpf_ringbuf_submit(evt, 0);
+    }
+}
+
+// ── Helper: check if an IP is RFC 1918 private ──────────────────────────────
+static __always_inline int is_rfc1918(__u32 ip_be)
+{
+    // ip_be is in network byte order (big endian)
+    __u8 b0 = (ip_be      ) & 0xFF;  // first octet
+    __u8 b1 = (ip_be >> 8 ) & 0xFF;  // second octet
+
+    // 10.0.0.0/8
+    if (b0 == 10)
+        return 1;
+
+    // 172.16.0.0/12 (172.16 - 172.31)
+    if (b0 == 172 && (b1 >= 16 && b1 <= 31))
+        return 1;
+
+    // 192.168.0.0/16
+    if (b0 == 192 && b1 == 168)
+        return 1;
+
+    return 0;
+}
+
+// ── XDP Program ─────────────────────────────────────────────────────────────
+SEC("xdp")
+int xdp_ingress(struct xdp_md *ctx)
+{
+    void *data     = (void *)(long)ctx->data;
+    void *data_end = (void *)(long)ctx->data_end;
+
+    // ── Parse Ethernet header ───────────────────────────────────────────
+    struct ethhdr *eth = data;
+    if ((void *)(eth + 1) > data_end)
+        return XDP_PASS;
+
+    // Only process IPv4
+    if (eth->h_proto != bpf_htons(ETH_P_IP))
+        return XDP_PASS;
+
+    // ── Parse IP header ─────────────────────────────────────────────────
+    struct iphdr *ip = (void *)(eth + 1);
+    if ((void *)(ip + 1) > data_end)
+        return XDP_PASS;
+
+    // Only process UDP
+    if (ip->protocol != IPPROTO_UDP)
+        return XDP_PASS;
+
+    // ── Parse UDP header ────────────────────────────────────────────────
+    /* Validate IHL */
+    if (ip->ihl < 5 || ip->ihl > 15)
+        return XDP_PASS;
+    if ((void *)ip + (ip->ihl * 4) > data_end)
+        return XDP_PASS;
+    struct udphdr *udp = (void *)ip + (ip->ihl * 4);
+    if ((void *)(udp + 1) > data_end)
+        return XDP_PASS;
+
+    // Only process source port 53 (DNS responses come FROM port 53)
+    if (udp->source != bpf_htons(53))
+        return XDP_PASS;
+
+    // ── DNS response payload ────────────────────────────────────────────
+    void *dns_start = (void *)(udp + 1);
+    // DNS header is 12 bytes minimum
+    if (dns_start + 12 > data_end) {
+        // Malformed — DNS header too short
+        emit_drop(ip->saddr, 0, REASON_MALFORMED);
+        return XDP_DROP;
+    }
+
+    // Read DNS transaction ID (first 2 bytes)
+    __u16 dns_txid = *(__u16 *)dns_start;
+
+    // Read DNS flags (bytes 2-3)
+    __u16 dns_flags = *(__u16 *)(dns_start + 2);
+    // QR bit is bit 15 (MSB of first byte in network order)
+    // In network byte order, QR=1 means this is a response
+    if (!(dns_flags & bpf_htons(0x8000)))
+        return XDP_PASS; // Not a response — pass through
+
+    // ── CHECK 1: Blocked source IP ──────────────────────────────────────
+    __u8 *blocked_reason = bpf_map_lookup_elem(&xdp_blocked_ips, &ip->saddr);
+    if (blocked_reason) {
+        emit_drop(ip->saddr, bpf_ntohs(dns_txid), REASON_BLOCKED_IP);
+        return XDP_DROP;
+    }
+
+    // ── CHECK 2: RFC 1918 rebinding attack ──────────────────────────────
+    // Parse the first answer record to check if it resolves to a private IP.
+    // DNS header: 12 bytes. Then QDCOUNT questions.
+    // Read QDCOUNT (bytes 4-5)
+    __u16 qdcount = bpf_ntohs(*(__u16 *)(dns_start + 4));
+    // Read ANCOUNT (bytes 6-7)
+    __u16 ancount = bpf_ntohs(*(__u16 *)(dns_start + 6));
+
+    if (ancount == 0 || qdcount == 0)
+        return XDP_PASS; // No answers to inspect
+
+    /* Only safely handle single-question responses in XDP */
+    if (qdcount > 1)
+        return XDP_PASS;
+
+    // Skip the question section — each question is: name + 4 bytes (QTYPE + QCLASS)
+    // We can only safely parse the first question with bounded iteration.
+    void *ptr = dns_start + 12;
+
+    // Skip question name (series of labels ending with 0x00 or compression pointer)
+    // Bound iteration to prevent verifier rejection
+    #pragma unroll
+    for (int i = 0; i < 64; i++) {
+        if (ptr + 1 > data_end)
+            return XDP_PASS;
+
+        __u8 label_len = *(__u8 *)ptr;
+
+        if (label_len == 0) {
+            ptr += 1;   // null terminator
+            break;
+        }
+
+        // Compression pointer (0xC0 or higher in top 2 bits)
+        if ((label_len & 0xC0) == 0xC0) {
+            ptr += 2;   // skip 2-byte pointer
+            break;
+        }
+
+        /* RFC 1035: max label length is 63 */
+        if (label_len > 63)
+            return XDP_PASS;
+
+        ptr += 1 + label_len;  // skip label length byte + label data
+    }
+
+    // Skip QTYPE (2 bytes) + QCLASS (2 bytes)
+    ptr += 4;
+    if (ptr > data_end)
+        return XDP_PASS;
+
+    // Now at the first answer record
+    // Answer: NAME (may be compressed) + TYPE(2) + CLASS(2) + TTL(4) + RDLENGTH(2) + RDATA
+    // Skip answer name
+    if (ptr + 1 > data_end)
+        return XDP_PASS;
+
+    __u8 ans_label = *(__u8 *)ptr;
+    if ((ans_label & 0xC0) == 0xC0) {
+        ptr += 2;  // compression pointer
+    } else {
+        // Skip labels — bounded
+        #pragma unroll
+        for (int i = 0; i < 64; i++) {
+            if (ptr + 1 > data_end)
+                return XDP_PASS;
+            __u8 ll = *(__u8 *)ptr;
+            if (ll == 0) { ptr += 1; break; }
+            if ((ll & 0xC0) == 0xC0) { ptr += 2; break; }
+            /* RFC 1035: max label length is 63 */
+            if (ll > 63) return XDP_PASS;
+            ptr += 1 + ll;
+        }
+    }
+
+    // TYPE(2) + CLASS(2) + TTL(4) + RDLENGTH(2) = 10 bytes
+    if (ptr + 10 > data_end)
+        return XDP_PASS;
+
+    __u16 rr_type = bpf_ntohs(*(__u16 *)ptr);
+    __u16 rdlength = bpf_ntohs(*(__u16 *)(ptr + 8));
+    ptr += 10;
+
+    // Only check A records (type 1) with RDLENGTH == 4
+    if (rr_type == 1 && rdlength == 4) {
+        if (ptr + 4 > data_end)
+            return XDP_PASS;
+
+        __u32 answer_ip = *(__u32 *)ptr;
+
+        if (is_rfc1918(answer_ip)) {
+            emit_drop(ip->saddr, bpf_ntohs(dns_txid), REASON_RFC1918_REBIND);
+            return XDP_DROP;
+        }
+    }
+
+    return XDP_PASS;
+}
+
+char _license[] SEC("license") = "GPL";
+</file>
 
 <file path="src/AegisDNS.XdpLoader/XdpMode.cs">
 // AegisDNS.XdpLoader/XdpMode.cs

@@ -57,6 +57,111 @@ src/
 <files>
 This section contains the contents of the repository's files.
 
+<file path="src/AegisDNS.Core/Utilities/ServiceLauncher.cs">
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
+
+namespace AegisDNS.Core.Utilities;
+
+public static class ServiceLauncher
+{
+    public static async Task<bool> StartServiceAsync()
+    {
+        return await Task.Run(() =>
+        {
+            try
+            {
+                string servicePath = GetServiceExecutablePath();
+                if (string.IsNullOrEmpty(servicePath)) return false;
+
+                ProcessStartInfo psi;
+                bool useDotnet = servicePath.StartsWith("dotnet|");
+                string finalPath = useDotnet ? servicePath.Split('|')[1] : servicePath;
+
+                string launcher = CanUsePkexec() ? "pkexec" : "sudo";
+
+                psi = new ProcessStartInfo(launcher)
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = false
+                };
+
+                if (useDotnet)
+                {
+                    psi.ArgumentList.Add("dotnet");
+                    psi.ArgumentList.Add(finalPath);
+                }
+                else
+                {
+                    psi.ArgumentList.Add(finalPath);
+                }
+
+                Process.Start(psi);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ServiceLauncher] Failed to start service: {ex.Message}");
+                return false;
+            }
+        });
+    }
+
+    private static string GetServiceExecutablePath()
+    {
+        string baseDir = AppContext.BaseDirectory;
+
+        // 1. Check current directory (for published builds)
+        string exeName = "AegisDNS.Service";
+        string path = Path.Combine(baseDir, exeName);
+        if (File.Exists(path)) return path;
+
+        // 2. Check development path
+        var dirInfo = new DirectoryInfo(baseDir);
+        while (dirInfo != null && dirInfo.Name != "AegisDNS")
+        {
+            dirInfo = dirInfo.Parent;
+        }
+
+        if (dirInfo != null)
+        {
+            string[] configs = { "Debug", "Release" };
+            foreach (var config in configs)
+            {
+                path = Path.Combine(dirInfo.FullName, "AegisDNS.Service", "bin", config, "net10.0", exeName);
+                if (File.Exists(path)) return path;
+
+                string dllPath = Path.Combine(dirInfo.FullName, "AegisDNS.Service", "bin", config, "net10.0", "AegisDNS.Service.dll");
+                if (File.Exists(dllPath)) return "dotnet|" + dllPath;
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static bool CanUsePkexec()
+    {
+        try
+        {
+            var psi = new ProcessStartInfo("which")
+            {
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            psi.ArgumentList.Add("pkexec");
+            using var process = Process.Start(psi);
+            process?.WaitForExit();
+            return process?.ExitCode == 0;
+        }
+        catch { return false; }
+    }
+}
+</file>
+
 <file path="src/AegisDNS.Service/Src/TamperMonitor.cs">
 using System;
 using System.Diagnostics;
@@ -187,111 +292,6 @@ public class TamperMonitor
             else
                 _broadcastAction("❌ XDP reattach failed — eBPF egress protection remains active");
         }
-    }
-}
-</file>
-
-<file path="src/AegisDNS.Core/Utilities/ServiceLauncher.cs">
-using System;
-using System.Diagnostics;
-using System.IO;
-using System.Runtime.InteropServices;
-using System.Threading.Tasks;
-
-namespace AegisDNS.Core.Utilities;
-
-public static class ServiceLauncher
-{
-    public static async Task<bool> StartServiceAsync()
-    {
-        return await Task.Run(() =>
-        {
-            try
-            {
-                string servicePath = GetServiceExecutablePath();
-                if (string.IsNullOrEmpty(servicePath)) return false;
-
-                ProcessStartInfo psi;
-                bool useDotnet = servicePath.StartsWith("dotnet|");
-                string finalPath = useDotnet ? servicePath.Split('|')[1] : servicePath;
-
-                string launcher = CanUsePkexec() ? "pkexec" : "sudo";
-
-                psi = new ProcessStartInfo(launcher)
-                {
-                    UseShellExecute = false,
-                    CreateNoWindow = false
-                };
-
-                if (useDotnet)
-                {
-                    psi.ArgumentList.Add("dotnet");
-                    psi.ArgumentList.Add(finalPath);
-                }
-                else
-                {
-                    psi.ArgumentList.Add(finalPath);
-                }
-
-                Process.Start(psi);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ServiceLauncher] Failed to start service: {ex.Message}");
-                return false;
-            }
-        });
-    }
-
-    private static string GetServiceExecutablePath()
-    {
-        string baseDir = AppContext.BaseDirectory;
-
-        // 1. Check current directory (for published builds)
-        string exeName = "AegisDNS.Service";
-        string path = Path.Combine(baseDir, exeName);
-        if (File.Exists(path)) return path;
-
-        // 2. Check development path
-        var dirInfo = new DirectoryInfo(baseDir);
-        while (dirInfo != null && dirInfo.Name != "AegisDNS")
-        {
-            dirInfo = dirInfo.Parent;
-        }
-
-        if (dirInfo != null)
-        {
-            string[] configs = { "Debug", "Release" };
-            foreach (var config in configs)
-            {
-                path = Path.Combine(dirInfo.FullName, "AegisDNS.Service", "bin", config, "net10.0", exeName);
-                if (File.Exists(path)) return path;
-
-                string dllPath = Path.Combine(dirInfo.FullName, "AegisDNS.Service", "bin", config, "net10.0", "AegisDNS.Service.dll");
-                if (File.Exists(dllPath)) return "dotnet|" + dllPath;
-            }
-        }
-
-        return string.Empty;
-    }
-
-    private static bool CanUsePkexec()
-    {
-        try
-        {
-            var psi = new ProcessStartInfo("which")
-            {
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            psi.ArgumentList.Add("pkexec");
-            using var process = Process.Start(psi);
-            process?.WaitForExit();
-            return process?.ExitCode == 0;
-        }
-        catch { return false; }
     }
 }
 </file>

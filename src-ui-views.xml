@@ -1,4 +1,4 @@
-This file is a merged representation of a subset of the codebase, containing specifically included files, combined into a single document by Repomix.
+This file is a merged representation of a subset of the codebase, containing specifically included files and files not matching ignore patterns, combined into a single document by Repomix.
 
 <file_summary>
 This section contains a summary of this file.
@@ -33,6 +33,7 @@ The content is organized as follows:
 - Some files may have been excluded based on .gitignore rules and Repomix's configuration
 - Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
 - Only files matching these patterns are included: src/AegisDNS.UI/InterFaces/*.axaml, src/AegisDNS.UI/InterFaces/*.axaml.cs
+- Files matching these patterns are excluded: obj/**, bin/**, *.user, *.suo, *.DotSettings, *.lock, node_modules/**
 - Files matching patterns in .gitignore are excluded
 - Files matching default ignore patterns are excluded
 - Files are sorted by Git change count (files with more changes are at the bottom)
@@ -2593,139 +2594,6 @@ public partial class GlowSettingsWindow : AegisLinuxWindow
 }
 </file>
 
-<file path="src/AegisDNS.UI/InterFaces/HttpsProxySettingsWindow.axaml">
-<utils:AegisLinuxWindow xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="clr-namespace:AegisDNS.ViewModels"
-        xmlns:utils="clr-namespace:AegisDNS.UI.Linux;assembly=AegisDNS.UI.Linux"
-        x:Class="AegisDNS.HttpsProxySettingsWindow"
-        Title="HTTPS AD BLOCKER"
-        Width="550" Height="650"
-        WindowStartupLocation="CenterOwner"
-        Background="Transparent"
-        CanResize="False"
-        SystemDecorations="None">
-
-    <Design.DataContext>
-        <vm:HttpsProxySettingsViewModel/>
-    </Design.DataContext>
-
-    <Border Background="#121212" CornerRadius="8" BorderBrush="#333333" BorderThickness="1">
-        <Grid RowDefinitions="38,*">
-            <!-- Title Bar -->
-            <Border Grid.Row="0" Background="#1A1A1A" PointerPressed="TitleBar_PointerPressed">
-                <Grid>
-                    <TextBlock Text="🔒 HTTPS AD BLOCKER (PRO)" Foreground="Cyan" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                    <Button Content="✕" HorizontalAlignment="Right" VerticalAlignment="Stretch" Width="38" Background="Transparent" BorderThickness="0" Foreground="Gray" Click="Close_Click"/>
-                </Grid>
-            </Border>
-
-            <!-- Content -->
-            <ScrollViewer Grid.Row="1" Padding="20">
-                <StackPanel Spacing="15">
-                    
-                    <Border Background="#1A1A1A" Padding="15" CornerRadius="8">
-                        <StackPanel Spacing="10">
-                            <StackPanel Orientation="Horizontal" Spacing="10">
-                                <ToggleSwitch IsChecked="{Binding EnableHttpsProxy}" OnContent="Active" OffContent="Disabled"/>
-                                <TextBlock Text="Enable HTTPS Ad Interception" Foreground="White" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                            </StackPanel>
-                            <TextBlock Text="This allows AegisDNS to decrypt and inspect HTTPS traffic to block URL-level ads (like YouTube video ads)." Foreground="#777777" FontSize="10" TextWrapping="Wrap"/>
-                        </StackPanel>
-                    </Border>
-
-                    <Border Background="#1A1A1A" Padding="15" CornerRadius="8">
-                        <StackPanel Spacing="10">
-                            <TextBlock Text="CA Certificate Status" Foreground="Cyan" FontSize="12" FontWeight="SemiBold"/>
-                            <Grid ColumnDefinitions="*,Auto">
-                                <TextBlock Text="{Binding CaStatus}" Foreground="White" VerticalAlignment="Center"/>
-                                <Button Grid.Column="1" Content="Install Certificate" Command="{Binding InstallCaCert}" IsVisible="{Binding !IsCaInstalled}" Background="#222222" BorderBrush="Cyan" BorderThickness="1"/>
-                            </Grid>
-                            <TextBlock Text="⚠️ Warning: This feature installs a local CA certificate into your system trust store. This is required for HTTPS inspection. The certificate is local to your machine and removed on uninstall." Foreground="#FF8C00" FontSize="10" TextWrapping="Wrap"/>
-                        </StackPanel>
-                    </Border>
-
-                    <Border Background="#1A1A1A" Padding="15" CornerRadius="8">
-                        <StackPanel Spacing="10">
-                            <TextBlock Text="Platform Blocking" Foreground="Cyan" FontSize="12" FontWeight="SemiBold"/>
-                            
-                            <CheckBox IsChecked="{Binding ProxyBlockYouTubeAds}" Content="Block YouTube Video Ads" Foreground="White"/>
-                            <CheckBox IsChecked="{Binding ProxyBlockSpotifyAds}" Content="Block Spotify Audio Ads" Foreground="White"/>
-                            <CheckBox IsChecked="{Binding ProxyBlockPrimeVideoAds}" Content="Block Prime Video Ads" Foreground="White"/>
-                            <CheckBox IsChecked="{Binding ProxyBlockDisneyPlusAds}" Content="Block Disney+ Ads" Foreground="White"/>
-                            <CheckBox IsChecked="{Binding ProxyBlockGenericAds}" Content="Block Generic Ad Networks" Foreground="White"/>
-                        </StackPanel>
-                    </Border>
-
-                    <Border Background="#1A1A1A" Padding="15" CornerRadius="8">
-                        <StackPanel Spacing="10">
-                            <TextBlock Text="Proxy Bypass List" Foreground="Cyan" FontSize="12" FontWeight="SemiBold"/>
-                            <TextBlock Text="Domains here will be relayed without decryption (useful for cert-pinned apps)." Foreground="#777777" FontSize="10" TextWrapping="Wrap"/>
-                            
-                            <ListBox ItemsSource="{Binding ProxyBypassDomains}" Height="120" Background="#121212" BorderBrush="#333333">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid ColumnDefinitions="*,Auto">
-                                            <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
-                                            <Button Grid.Column="1" Content="✕" Foreground="Red" Background="Transparent" 
-                                                    Command="{Binding $parent[ListBox].DataContext.RemoveBypassDomain}" CommandParameter="{Binding}"/>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-
-                            <Grid ColumnDefinitions="*,Auto" Margin="0,5,0,0">
-                                <TextBox Text="{Binding NewBypassDomain}" Watermark="Add domain (e.g. *.signal.org)" Background="#121212"/>
-                                <Button Grid.Column="1" Content="Add" Command="{Binding AddBypassDomain}" Margin="5,0,0,0"/>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-
-                    <Button Content="SAVE &amp; APPLY" Command="{Binding Save}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Background="#004444" Foreground="Cyan" FontWeight="Bold" Margin="0,10,0,0"/>
-                </StackPanel>
-            </ScrollViewer>
-        </Grid>
-    </Border>
-</utils:AegisLinuxWindow>
-</file>
-
-<file path="src/AegisDNS.UI/InterFaces/HttpsProxySettingsWindow.axaml.cs">
-using AegisDNS.UI.Linux;
-using AegisDNS.ViewModels;
-
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Input;
-using Avalonia.Interactivity;
-using Avalonia.Markup.Xaml;
-
-namespace AegisDNS;
-
-public partial class HttpsProxySettingsWindow : AegisLinuxWindow
-{
-    public HttpsProxySettingsWindow()
-    {
-        InitializeComponent();
-        DataContext = new HttpsProxySettingsViewModel();
-    }
-
-    private void InitializeComponent()
-    {
-        AvaloniaXamlLoader.Load(this);
-    }
-
-    private void TitleBar_PointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        HandleTitleBarDrag(e);
-    }
-
-    private void Close_Click(object? sender, RoutedEventArgs e)
-    {
-        Close();
-    }
-}
-</file>
-
 <file path="src/AegisDNS.UI/InterFaces/LicenseWindow.axaml">
 <utils:AegisLinuxWindow
     xmlns="https://github.com/avaloniaui"
@@ -4776,180 +4644,6 @@ public partial class BlocklistSettingsWindow : AegisLinuxWindow, IViewFor<Settin
 }
 </file>
 
-<file path="src/AegisDNS.UI/InterFaces/CloudConnectWindow.axaml.cs">
-using System;
-using System.Net.Http;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
-
-using AegisDNS.Core;
-using AegisDNS.UI.Linux;
-
-using Avalonia.Controls;
-using Avalonia.Input;
-using Avalonia.Interactivity;
-using Avalonia.Media;
-using Avalonia.Threading;
-
-namespace AegisDNS.UI
-{
-    public partial class CloudConnectWindow : AegisLinuxWindow
-    {
-        private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(15) };
-
-        public CloudConnectWindow()
-        {
-            InitializeComponent();
-
-            // Pre-fill endpoint from current config
-            endpointBox.Text = SecurityConfigManager.Settings.CloudApiEndpoint;
-        }
-
-        // ── Drag / Close ──────────────────────────────────────────────────────
-        private void TitleBar_PointerPressed(object? sender, PointerPressedEventArgs e)
-        {
-            if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
-                BeginMoveDrag(e);
-        }
-
-        private void CloseDot_PointerPressed(object? sender, PointerPressedEventArgs e) => Close();
-        private void CancelButton_Click(object? sender, RoutedEventArgs e) => Close();
-        private void DoneButton_Click(object? sender, RoutedEventArgs e) => Close();
-
-        // ── Step 1 → Step 2 ───────────────────────────────────────────────────
-        private async void ConnectButton_Click(object? sender, RoutedEventArgs e)
-        {
-            var licenseKey = licenseKeyBox.Text?.Trim() ?? string.Empty;
-            var endpoint = endpointBox.Text?.Trim() ?? string.Empty;
-
-            if (string.IsNullOrWhiteSpace(licenseKey) || licenseKey.Length < 16)
-            {
-                ShowStep1Error("Please enter a valid license key.");
-                return;
-            }
-
-            if (!Uri.TryCreate(endpoint, UriKind.Absolute, out _) ||
-                (!endpoint.StartsWith("https://") && !endpoint.StartsWith("http://")))
-            {
-                ShowStep1Error("Please enter a valid API endpoint URL.");
-                return;
-            }
-
-            // Save endpoint
-            SecurityConfigManager.Settings.CloudApiEndpoint = endpoint;
-
-            // Move to step 2
-            GoToStep(2);
-            await RegisterDeviceAsync(licenseKey, endpoint);
-        }
-
-        private async Task RegisterDeviceAsync(string licenseKey, string endpoint)
-        {
-            try
-            {
-                SetConnectingStatus("Retrieving hardware identity...");
-                var hwid = AegisDNS.Licensing.HardwareIdentity.Get();
-
-                SetConnectingStatus("Contacting cloud backend...");
-
-                var payload = JsonSerializer.Serialize(new
-                {
-                    licenseKey,
-                    hardwareId = hwid,
-                    platform = "linux",
-                    version = "1.0.0"
-                });
-
-                using var req = new HttpRequestMessage(HttpMethod.Post, $"{endpoint}/api/device/register");
-                req.Content = new StringContent(payload, Encoding.UTF8, "application/json");
-
-                var resp = await _http.SendAsync(req);
-                var body = await resp.Content.ReadAsStringAsync();
-
-                if (!resp.IsSuccessStatusCode)
-                {
-                    string errorMsg = resp.StatusCode switch
-                    {
-                        System.Net.HttpStatusCode.BadRequest when body.Contains("LicenseExpired") => "License has expired. Please renew.",
-                        System.Net.HttpStatusCode.BadRequest when body.Contains("DeviceLimitExceeded") => "Device limit exceeded for this license.",
-                        System.Net.HttpStatusCode.BadRequest when body.Contains("InvalidLicense") => "License key not found or invalid.",
-                        _ => $"Server error ({(int)resp.StatusCode}). Please try again."
-                    };
-
-                    await Dispatcher.UIThread.InvokeAsync(() =>
-                    {
-                        GoToStep(1);
-                        ShowStep1Error(errorMsg);
-                    });
-                    return;
-                }
-
-                // Parse response
-                using var doc = JsonDocument.Parse(body);
-                var root = doc.RootElement;
-                var deviceId = root.GetProperty("deviceId").GetString() ?? "";
-                var apiToken = root.GetProperty("apiToken").GetString() ?? "";
-                var tier = root.GetProperty("tier").GetString() ?? "Pro";
-                var policyVer = root.GetProperty("policyVersion").GetInt32();
-
-                // Persist to config (token in memory; caller should encrypt via AesGcmTokenStore)
-                SecurityConfigManager.Settings.DeviceApiToken = apiToken;
-                SecurityConfigManager.Settings.CloudDeviceId = deviceId;
-                SecurityConfigManager.Settings.CloudPolicyVersion = policyVer;
-                SecurityConfigManager.Settings.CloudSyncEnabled = true;
-                SecurityConfigManager.Settings.CloudSyncFailureCount = 0;
-                SecurityConfigManager.Save();
-
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    deviceIdLabel.Text = deviceId.Length > 18 ? deviceId[..18] + "…" : deviceId;
-                    tierLabel.Text = tier.ToUpperInvariant();
-                    policyLabel.Text = policyVer > 0 ? $"v{policyVer} synced" : "No policy (defaults apply)";
-                    GoToStep(3);
-                });
-            }
-            catch (HttpRequestException ex)
-            {
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    GoToStep(1);
-                    ShowStep1Error($"Network error: {ex.Message}");
-                });
-            }
-            catch (Exception ex)
-            {
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    GoToStep(1);
-                    ShowStep1Error($"Unexpected error: {ex.Message}");
-                });
-            }
-        }
-
-        // ── helpers ───────────────────────────────────────────────────────────
-        private void GoToStep(int step)
-        {
-            step1Panel.IsVisible = step == 1;
-            step2Panel.IsVisible = step == 2;
-            step3Panel.IsVisible = step == 3;
-            step1Dot.Fill = step >= 1 ? Brushes.Cyan : Brushes.Gray;
-            step2Dot.Fill = step >= 2 ? Brushes.Cyan : new SolidColorBrush(0xFF444444);
-            step3Dot.Fill = step >= 3 ? Brushes.Cyan : new SolidColorBrush(0xFF444444);
-        }
-
-        private void ShowStep1Error(string msg)
-        {
-            step1Error.Text = msg;
-            step1Error.IsVisible = true;
-        }
-
-        private void SetConnectingStatus(string msg) =>
-            Dispatcher.UIThread.Post(() => connectingStatus.Text = msg);
-    }
-}
-</file>
-
 <file path="src/AegisDNS.UI/InterFaces/DotSettingsWindow.axaml.cs">
 using System;
 using System.Threading.Tasks;
@@ -5093,6 +4787,169 @@ public partial class ExtensionApiWindow : AegisLinuxWindow
     private void CloseDot_PointerPressed(object? sender, PointerPressedEventArgs e) => Close();
     private void MinDot_PointerPressed(object? sender, PointerPressedEventArgs e) => WindowState = WindowState.Minimized;
     private void BackBtn_PointerPressed(object? sender, PointerPressedEventArgs e) { new SettingsWindow().Show(); Close(); }
+}
+</file>
+
+<file path="src/AegisDNS.UI/InterFaces/HttpsProxySettingsWindow.axaml">
+<utils:AegisLinuxWindow xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:AegisDNS.ViewModels"
+        xmlns:utils="clr-namespace:AegisDNS.UI.Linux;assembly=AegisDNS.UI.Linux"
+        x:Class="AegisDNS.HttpsProxySettingsWindow"
+        Title="HTTPS AD BLOCKER"
+        Width="550" Height="650"
+        WindowStartupLocation="CenterOwner"
+        Background="Transparent"
+        CanResize="False"
+        SystemDecorations="None">
+
+    <Design.DataContext>
+        <vm:HttpsProxySettingsViewModel/>
+    </Design.DataContext>
+
+    <Border Background="#121212" CornerRadius="8" BorderBrush="#333333" BorderThickness="1">
+        <Grid RowDefinitions="38,*,50">
+            <!-- Title Bar -->
+            <Border Grid.Row="0" Background="#1A1A1A" PointerPressed="TitleBar_PointerPressed">
+                <Grid>
+                    <TextBlock Text="🔒 HTTPS AD BLOCKER (PRO)" Foreground="Cyan" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    <Button Content="✕" HorizontalAlignment="Right" VerticalAlignment="Stretch" Width="38" Background="Transparent" BorderThickness="0" Foreground="Gray" Click="Close_Click"/>
+                </Grid>
+            </Border>
+
+            <!-- Content -->
+            <ScrollViewer Grid.Row="1" Padding="20">
+                <StackPanel Spacing="15">
+                    
+                    <Border Background="#1A1A1A" Padding="15" CornerRadius="8">
+                        <StackPanel Spacing="10">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <ToggleSwitch IsChecked="{Binding EnableHttpsProxy}" OnContent="Active" OffContent="Disabled"/>
+                                <TextBlock Text="Enable HTTPS Ad Interception" Foreground="White" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                            </StackPanel>
+                            <TextBlock Text="This allows AegisDNS to decrypt and inspect HTTPS traffic to block URL-level ads (like YouTube video ads)." Foreground="#777777" FontSize="10" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#1A1A1A" Padding="15" CornerRadius="8">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="CA Certificate Status" Foreground="Cyan" FontSize="12" FontWeight="SemiBold"/>
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Text="{Binding CaStatus}" Foreground="White" VerticalAlignment="Center"/>
+                                <Button Grid.Column="1" Content="Install Certificate" Command="{Binding InstallCaCert}" IsVisible="{Binding !IsCaInstalled}" Background="#222222" BorderBrush="Cyan" BorderThickness="1"/>
+                            </Grid>
+                            <TextBlock Text="⚠️ Warning: This feature installs a local CA certificate into your system trust store. This is required for HTTPS inspection. The certificate is local to your machine and removed on uninstall." Foreground="#FF8C00" FontSize="10" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#1A1A1A" Padding="15" CornerRadius="8">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Platform Blocking" Foreground="Cyan" FontSize="12" FontWeight="SemiBold"/>
+                            
+                            <CheckBox IsChecked="{Binding ProxyBlockYouTubeAds}" Content="Block YouTube Video Ads" Foreground="White"/>
+                            <CheckBox IsChecked="{Binding ProxyBlockSpotifyAds}" Content="Block Spotify Audio Ads" Foreground="White"/>
+                            <CheckBox IsChecked="{Binding ProxyBlockPrimeVideoAds}" Content="Block Prime Video Ads" Foreground="White"/>
+                            <CheckBox IsChecked="{Binding ProxyBlockDisneyPlusAds}" Content="Block Disney+ Ads" Foreground="White"/>
+                            <CheckBox IsChecked="{Binding ProxyBlockGenericAds}" Content="Block Generic Ad Networks" Foreground="White"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#1A1A1A" Padding="15" CornerRadius="8">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Proxy Bypass List" Foreground="Cyan" FontSize="12" FontWeight="SemiBold"/>
+                            <TextBlock Text="Domains here will be relayed without decryption (useful for cert-pinned apps)." Foreground="#777777" FontSize="10" TextWrapping="Wrap"/>
+                            
+                            <ListBox ItemsSource="{Binding ProxyBypassDomains}" Height="120" Background="#121212" BorderBrush="#333333">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+                                            <Button Grid.Column="1" Content="✕" Foreground="Red" Background="Transparent" 
+                                                    Command="{Binding $parent[ListBox].DataContext.RemoveBypassDomain}" CommandParameter="{Binding}"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,5,0,0">
+                                <TextBox Text="{Binding NewBypassDomain}" Watermark="Add domain (e.g. *.signal.org)" Background="#121212"/>
+                                <Button Grid.Column="1" Content="Add" Command="{Binding AddBypassDomain}" Margin="5,0,0,0"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Footer -->
+            <Border Grid.Row="2" Background="#161616" BorderThickness="0,1,0,0" BorderBrush="#222">
+                <Grid Margin="20,0">
+                    <Button x:Name="saveBtn" Content="SAVE &amp; APPLY"
+                            Background="#006666" Foreground="Cyan" FontWeight="Bold" FontSize="11"
+                            CornerRadius="4" HorizontalAlignment="Right" VerticalAlignment="Center"
+                            Cursor="Hand" Padding="15,6"/>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</utils:AegisLinuxWindow>
+</file>
+
+<file path="src/AegisDNS.UI/InterFaces/HttpsProxySettingsWindow.axaml.cs">
+using System.Threading.Tasks;
+
+using AegisDNS.UI.Linux;
+using AegisDNS.ViewModels;
+
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Markup.Xaml;
+using Avalonia.Media;
+
+namespace AegisDNS;
+
+public partial class HttpsProxySettingsWindow : AegisLinuxWindow
+{
+    public HttpsProxySettingsWindow()
+    {
+        InitializeComponent();
+        DataContext = new HttpsProxySettingsViewModel();
+
+        var saveBtn = this.FindControl<Button>("saveBtn");
+        if (saveBtn != null)
+        {
+            saveBtn.Click += async (s, e) =>
+            {
+                (DataContext as HttpsProxySettingsViewModel)?.Save.Execute().Subscribe();
+                var originalContent = saveBtn.Content;
+                saveBtn.Content = "✅ Saved";
+                saveBtn.Background = new SolidColorBrush(Color.Parse("#004400"));
+                saveBtn.Foreground = Brushes.LimeGreen;
+                await Task.Delay(1500);
+                saveBtn.Content = originalContent;
+                saveBtn.Background = new SolidColorBrush(Color.Parse("#004444"));
+                saveBtn.Foreground = Brushes.Cyan;
+            };
+        }
+    }
+
+    private void InitializeComponent()
+    {
+        AvaloniaXamlLoader.Load(this);
+    }
+
+    private void TitleBar_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        HandleTitleBarDrag(e);
+    }
+
+    private void Close_Click(object? sender, RoutedEventArgs e)
+    {
+        (DataContext as HttpsProxySettingsViewModel)?.Save.Execute().Subscribe();
+        Close();
+    }
 }
 </file>
 
@@ -5899,6 +5756,180 @@ public partial class XdpSettingsWindow : AegisLinuxWindow, IViewFor<XdpSettingsV
             cb.Foreground = new SolidColorBrush(Color.Parse("#B0B0B0"));
             cb.Effect = null;
         };
+    }
+}
+</file>
+
+<file path="src/AegisDNS.UI/InterFaces/CloudConnectWindow.axaml.cs">
+using System;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks;
+
+using AegisDNS.Core;
+using AegisDNS.UI.Linux;
+
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Media;
+using Avalonia.Threading;
+
+namespace AegisDNS.UI
+{
+    public partial class CloudConnectWindow : AegisLinuxWindow
+    {
+        private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(15) };
+
+        public CloudConnectWindow()
+        {
+            InitializeComponent();
+
+            // Pre-fill endpoint from current config
+            endpointBox.Text = SecurityConfigManager.Settings.CloudApiEndpoint;
+        }
+
+        // ── Drag / Close ──────────────────────────────────────────────────────
+        private void TitleBar_PointerPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+                BeginMoveDrag(e);
+        }
+
+        private void CloseDot_PointerPressed(object? sender, PointerPressedEventArgs e) => Close();
+        private void CancelButton_Click(object? sender, RoutedEventArgs e) => Close();
+        private void DoneButton_Click(object? sender, RoutedEventArgs e) => Close();
+
+        // ── Step 1 → Step 2 ───────────────────────────────────────────────────
+        private async void ConnectButton_Click(object? sender, RoutedEventArgs e)
+        {
+            var licenseKey = licenseKeyBox.Text?.Trim() ?? string.Empty;
+            var endpoint = endpointBox.Text?.Trim() ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(licenseKey) || licenseKey.Length < 16)
+            {
+                ShowStep1Error("Please enter a valid license key.");
+                return;
+            }
+
+            if (!Uri.TryCreate(endpoint, UriKind.Absolute, out _) ||
+                (!endpoint.StartsWith("https://") && !endpoint.StartsWith("http://")))
+            {
+                ShowStep1Error("Please enter a valid API endpoint URL.");
+                return;
+            }
+
+            // Save endpoint
+            SecurityConfigManager.Settings.CloudApiEndpoint = endpoint;
+
+            // Move to step 2
+            GoToStep(2);
+            await RegisterDeviceAsync(licenseKey, endpoint);
+        }
+
+        private async Task RegisterDeviceAsync(string licenseKey, string endpoint)
+        {
+            try
+            {
+                SetConnectingStatus("Retrieving hardware identity...");
+                var hwid = AegisDNS.Licensing.HardwareIdentity.Get();
+
+                SetConnectingStatus("Contacting cloud backend...");
+
+                var payload = JsonSerializer.Serialize(new
+                {
+                    licenseKey,
+                    hardwareId = hwid,
+                    platform = "linux",
+                    version = "1.0.0"
+                });
+
+                using var req = new HttpRequestMessage(HttpMethod.Post, $"{endpoint}/api/device/register");
+                req.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+                var resp = await _http.SendAsync(req);
+                var body = await resp.Content.ReadAsStringAsync();
+
+                if (!resp.IsSuccessStatusCode)
+                {
+                    string errorMsg = resp.StatusCode switch
+                    {
+                        System.Net.HttpStatusCode.BadRequest when body.Contains("LicenseExpired") => "License has expired. Please renew.",
+                        System.Net.HttpStatusCode.BadRequest when body.Contains("DeviceLimitExceeded") => "Device limit exceeded for this license.",
+                        System.Net.HttpStatusCode.BadRequest when body.Contains("InvalidLicense") => "License key not found or invalid.",
+                        _ => $"Server error ({(int)resp.StatusCode}). Please try again."
+                    };
+
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        GoToStep(1);
+                        ShowStep1Error(errorMsg);
+                    });
+                    return;
+                }
+
+                // Parse response
+                using var doc = JsonDocument.Parse(body);
+                var root = doc.RootElement;
+                var deviceId = root.GetProperty("deviceId").GetString() ?? "";
+                var apiToken = root.GetProperty("apiToken").GetString() ?? "";
+                var tier = root.GetProperty("tier").GetString() ?? "Pro";
+                var policyVer = root.GetProperty("policyVersion").GetInt32();
+
+                // Persist to config (token in memory; caller should encrypt via AesGcmTokenStore)
+                SecurityConfigManager.Settings.DeviceApiToken = apiToken;
+                SecurityConfigManager.Settings.CloudDeviceId = deviceId;
+                SecurityConfigManager.Settings.CloudPolicyVersion = policyVer;
+                SecurityConfigManager.Settings.CloudSyncEnabled = true;
+                SecurityConfigManager.Settings.CloudSyncFailureCount = 0;
+                SecurityConfigManager.Save();
+
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    deviceIdLabel.Text = deviceId.Length > 18 ? deviceId[..18] + "…" : deviceId;
+                    tierLabel.Text = tier.ToUpperInvariant();
+                    policyLabel.Text = policyVer > 0 ? $"v{policyVer} synced" : "No policy (defaults apply)";
+                    GoToStep(3);
+                });
+            }
+            catch (HttpRequestException ex)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    GoToStep(1);
+                    ShowStep1Error($"Network error: {ex.Message}");
+                });
+            }
+            catch (Exception ex)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    GoToStep(1);
+                    ShowStep1Error($"Unexpected error: {ex.Message}");
+                });
+            }
+        }
+
+        // ── helpers ───────────────────────────────────────────────────────────
+        private void GoToStep(int step)
+        {
+            step1Panel.IsVisible = step == 1;
+            step2Panel.IsVisible = step == 2;
+            step3Panel.IsVisible = step == 3;
+            step1Dot.Fill = step >= 1 ? Brushes.Cyan : Brushes.Gray;
+            step2Dot.Fill = step >= 2 ? Brushes.Cyan : new SolidColorBrush(0xFF444444);
+            step3Dot.Fill = step >= 3 ? Brushes.Cyan : new SolidColorBrush(0xFF444444);
+        }
+
+        private void ShowStep1Error(string msg)
+        {
+            step1Error.Text = msg;
+            step1Error.IsVisible = true;
+        }
+
+        private void SetConnectingStatus(string msg) =>
+            Dispatcher.UIThread.Post(() => connectingStatus.Text = msg);
     }
 }
 </file>

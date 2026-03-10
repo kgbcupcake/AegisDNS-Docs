@@ -95,6 +95,119 @@ awIDAQAB
 -----END PUBLIC KEY-----
 </file>
 
+<file path="src/AegisDNS.Core/Security/IntegrityChecker.cs">
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+
+namespace AegisDNS.Core.Security;
+
+// static class: logger injection deferred — all methods are static, DI not applicable.
+public class IntegrityChecker
+{
+    // RSA-2048 Public Key for Integrity Manifest Verification
+    // Generated specifically for this instance.
+    public const string IntegrityPublicKey = @"-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuOi6SwJGTwgGinKDyXu+
+diqOt7FgER3hYaLrGkmcFqBGT+Pbo4TtFrL/zg0t6fwiVVOKcAYlZB+XGD2Lfyut
+IQxjJUAdO1cNxzYhY3flgISB6LbIfz2jdayV1x8CzzZyzef5vGRVz80qfQPXAMDN
+eNsogAd6sEB0s+lI6dmPxL9QWvFBW+SRkFifk5S8HRqgFKkhe2n1dGCa1NGHrB7t
+OOu5wyIrroAEDftNBQtZQnfJ9/2ly+YnFtB7/5WTRwv/DGoWxZXxH10X5BvNBNFz
+5ivK8zqb1bUP5ev0eqOK641OFcVJZjfuEL2VS6zH08+AYXRAbCFnNTgNUE65hUfs
+5wIDAQAB
+-----END PUBLIC KEY-----";
+
+    public static async Task<bool> VerifyEnvironmentAsync()
+    {
+        try
+        {
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string manifestPath = Path.Combine(baseDir, "integrity.manifest");
+            string sigPath = Path.Combine(baseDir, "integrity.manifest.sig");
+
+            if (!File.Exists(manifestPath) || !File.Exists(sigPath))
+            {
+                System.Diagnostics.Debug.WriteLine("[Integrity] Missing manifest or signature. Integrity verification severely compromised.");
+                return false;
+            }
+
+            // 1. Verify Signature
+            byte[] manifestBytes = await File.ReadAllBytesAsync(manifestPath);
+            byte[] signatureBytes = await File.ReadAllBytesAsync(sigPath);
+
+            using var rsa = RSA.Create();
+            rsa.ImportFromPem(IntegrityPublicKey);
+
+            if (!rsa.VerifyData(manifestBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1))
+            {
+                System.Diagnostics.Debug.WriteLine("[Integrity] Signature Verification FAILED.");
+                return false;
+            }
+
+            Dictionary<string, string>? manifest;
+            try
+            {
+                manifest = JsonSerializer.Deserialize<Dictionary<string, string>>(manifestBytes);
+            }
+            catch (JsonException)
+            {
+                return false;
+            }
+            if (manifest == null) return false;
+
+            // 3. Check Files
+            foreach (var kvp in manifest)
+            {
+                string filename = kvp.Key;
+                string expectedHash = kvp.Value;
+                string filePath = Path.Combine(baseDir, filename);
+
+                if (!File.Exists(filePath)) return false;
+
+                using var sha = SHA256.Create();
+                using var stream = File.OpenRead(filePath);
+                byte[] hashBytes = await sha.ComputeHashAsync(stream);
+                string actualHash = Convert.ToBase64String(hashBytes);
+
+                if (actualHash != expectedHash)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[Integrity] Mismatch: {filename}");
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Integrity] Check failed: {ex.Message}");
+            return false;
+        }
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Licensing/AegisDNS.Licensing.csproj">
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AegisDNS.Licensing.Tests" />
+  </ItemGroup>
+
+
+</Project>
+</file>
+
 <file path="src/AegisDNS.Core/Security/CertificateManager.cs">
 using System;
 using System.Collections.Concurrent;
@@ -119,8 +232,7 @@ namespace AegisDNS.Core.Security;
 public static class CertificateManager
 {
     private static readonly string CaDir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".config", "aegisdns", "ca");
+        "/var/lib/aegisdns", "ca");
 
     private static readonly string PfxPath = Path.Combine(CaDir, "aegisdns-ca.pfx");
     private static readonly string PemPath = Path.Combine(CaDir, "aegisdns-ca.pem");
@@ -238,7 +350,14 @@ public static class CertificateManager
                 // Use 'sh -c' to combine commands under sudo/pkexec
                 psi.ArgumentList.Add("sh");
                 psi.ArgumentList.Add("-c");
-                psi.ArgumentList.Add($"cp \"{PemPath}\" \"{targetPath}\" && {updateCmd}");
+                // Install PEM into trust store, then fix permissions on CA dir so both
+                // root (service) and the UI user (uid 1000) can read pfx/token.
+                psi.ArgumentList.Add(
+                    $"cp \"{PemPath}\" \"{targetPath}\" && {updateCmd} && " +
+                    $"chmod 755 \"{CaDir}\" && " +
+                    $"chmod 644 \"{PemPath}\" && " +
+                    $"chmod 640 \"{PfxPath}\" && chmod 640 \"{PassphrasePath}\" && " +
+                    $"chown root:aegisdns \"{PfxPath}\" \"{PassphrasePath}\" 2>/dev/null || true");
 
                 var process = Process.Start(psi);
                 process?.WaitForExit();
@@ -295,7 +414,7 @@ public static class CertificateManager
     }
 
     /// <summary>
-    /// Generates a short-lived ECDSA P-256 certificate for the specified hostname.
+    /// Generates a short-lived RSA 2048 certificate for the specified hostname.
     /// Signed by the local CA.
     /// </summary>
     public static X509Certificate2 GenerateHostCert(string hostname)
@@ -307,11 +426,12 @@ public static class CertificateManager
 
         var ca = GetOrGenerateCa();
 
-        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var rsa = RSA.Create(2048);
         var request = new CertificateRequest(
             $"CN={hostname}",
-            ecdsa,
-            HashAlgorithmName.SHA256);
+            rsa,
+            HashAlgorithmName.SHA256,
+            RSASignaturePadding.Pkcs1);
 
         var sanBuilder = new SubjectAlternativeNameBuilder();
         sanBuilder.AddDnsName(hostname);
@@ -338,7 +458,7 @@ public static class CertificateManager
         using var hostCert = request.Create(ca, notBefore, notAfter, serialNumber);
 
         // We MUST associate the private key with the certificate for SslStream to use it.
-        var certWithKey = hostCert.CopyWithPrivateKey(ecdsa);
+        var certWithKey = hostCert.CopyWithPrivateKey(rsa);
 
         _certCache[hostname] = (certWithKey, notAfter.UtcDateTime);
         return certWithKey;
@@ -355,119 +475,6 @@ public static class CertificateManager
         return false;
     }
 }
-</file>
-
-<file path="src/AegisDNS.Core/Security/IntegrityChecker.cs">
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
-
-namespace AegisDNS.Core.Security;
-
-// static class: logger injection deferred — all methods are static, DI not applicable.
-public class IntegrityChecker
-{
-    // RSA-2048 Public Key for Integrity Manifest Verification
-    // Generated specifically for this instance.
-    public const string IntegrityPublicKey = @"-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuOi6SwJGTwgGinKDyXu+
-diqOt7FgER3hYaLrGkmcFqBGT+Pbo4TtFrL/zg0t6fwiVVOKcAYlZB+XGD2Lfyut
-IQxjJUAdO1cNxzYhY3flgISB6LbIfz2jdayV1x8CzzZyzef5vGRVz80qfQPXAMDN
-eNsogAd6sEB0s+lI6dmPxL9QWvFBW+SRkFifk5S8HRqgFKkhe2n1dGCa1NGHrB7t
-OOu5wyIrroAEDftNBQtZQnfJ9/2ly+YnFtB7/5WTRwv/DGoWxZXxH10X5BvNBNFz
-5ivK8zqb1bUP5ev0eqOK641OFcVJZjfuEL2VS6zH08+AYXRAbCFnNTgNUE65hUfs
-5wIDAQAB
------END PUBLIC KEY-----";
-
-    public static async Task<bool> VerifyEnvironmentAsync()
-    {
-        try
-        {
-            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            string manifestPath = Path.Combine(baseDir, "integrity.manifest");
-            string sigPath = Path.Combine(baseDir, "integrity.manifest.sig");
-
-            if (!File.Exists(manifestPath) || !File.Exists(sigPath))
-            {
-                System.Diagnostics.Debug.WriteLine("[Integrity] Missing manifest or signature. Integrity verification severely compromised.");
-                return false;
-            }
-
-            // 1. Verify Signature
-            byte[] manifestBytes = await File.ReadAllBytesAsync(manifestPath);
-            byte[] signatureBytes = await File.ReadAllBytesAsync(sigPath);
-
-            using var rsa = RSA.Create();
-            rsa.ImportFromPem(IntegrityPublicKey);
-
-            if (!rsa.VerifyData(manifestBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1))
-            {
-                System.Diagnostics.Debug.WriteLine("[Integrity] Signature Verification FAILED.");
-                return false;
-            }
-
-            Dictionary<string, string>? manifest;
-            try
-            {
-                manifest = JsonSerializer.Deserialize<Dictionary<string, string>>(manifestBytes);
-            }
-            catch (JsonException)
-            {
-                return false;
-            }
-            if (manifest == null) return false;
-
-            // 3. Check Files
-            foreach (var kvp in manifest)
-            {
-                string filename = kvp.Key;
-                string expectedHash = kvp.Value;
-                string filePath = Path.Combine(baseDir, filename);
-
-                if (!File.Exists(filePath)) return false;
-
-                using var sha = SHA256.Create();
-                using var stream = File.OpenRead(filePath);
-                byte[] hashBytes = await sha.ComputeHashAsync(stream);
-                string actualHash = Convert.ToBase64String(hashBytes);
-
-                if (actualHash != expectedHash)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[Integrity] Mismatch: {filename}");
-                    return false;
-                }
-            }
-
-            return true;
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[Integrity] Check failed: {ex.Message}");
-            return false;
-        }
-    }
-}
-</file>
-
-<file path="src/AegisDNS.Licensing/AegisDNS.Licensing.csproj">
-<Project Sdk="Microsoft.NET.Sdk">
-
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-  </PropertyGroup>
-
-  <ItemGroup>
-  </ItemGroup>
-  <ItemGroup>
-    <InternalsVisibleTo Include="AegisDNS.Licensing.Tests" />
-  </ItemGroup>
-
-
-</Project>
 </file>
 
 <file path="src/AegisDNS.Licensing/AesGcmTokenStore.cs">
