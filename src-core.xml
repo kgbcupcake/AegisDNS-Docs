@@ -1,4 +1,4 @@
-This file is a merged representation of a subset of the codebase, containing specifically included files and files not matching ignore patterns, combined into a single document by Repomix.
+This file is a merged representation of a subset of the codebase, containing specifically included files, combined into a single document by Repomix.
 
 <file_summary>
 This section contains a summary of this file.
@@ -33,7 +33,6 @@ The content is organized as follows:
 - Some files may have been excluded based on .gitignore rules and Repomix's configuration
 - Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
 - Only files matching these patterns are included: src/AegisDNS.Core/**/*.cs
-- Files matching these patterns are excluded: obj/**, bin/**, *.user, *.suo, *.DotSettings, *.lock, node_modules/**
 - Files matching patterns in .gitignore are excluded
 - Files matching default ignore patterns are excluded
 - Files are sorted by Git change count (files with more changes are at the bottom)
@@ -8367,38 +8366,41 @@ public static class IpcSystem
     [SupportedOSPlatform("linux")]
     private static async Task StartLinuxCommandServerAsync(Func<IpcPacket, Task<IpcPacket>> onCommand, CancellationToken token)
     {
-        try
+        while (!token.IsCancellationRequested)
         {
-            if (File.Exists(CommandSocketPath))
+            try
             {
-                File.Delete(CommandSocketPath);
+                if (File.Exists(CommandSocketPath))
+                {
+                    File.Delete(CommandSocketPath);
+                }
+
+                using var endPoint = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+                endPoint.Bind(new UnixDomainSocketEndPoint(CommandSocketPath));
+
+                // Setup access permissions for UI side
+                SetSocketPermissions(CommandSocketPath);
+
+                endPoint.Listen(20); // 20 concurrent IPC connections supported before backlog
+
+                while (!token.IsCancellationRequested)
+                {
+                    var clientSocket = await endPoint.AcceptAsync(token);
+                    _ = HandleLinuxCommandConnectionAsync(clientSocket, onCommand, token);
+                }
             }
-
-            using var endPoint = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
-            endPoint.Bind(new UnixDomainSocketEndPoint(CommandSocketPath));
-
-            // Setup access permissions for UI side
-            SetSocketPermissions(CommandSocketPath);
-
-            endPoint.Listen(20); // 20 concurrent IPC connections supported before backlog
-
-            while (!token.IsCancellationRequested)
+            catch (OperationCanceledException) { return; }
+            catch (Exception ex)
             {
-                var clientSocket = await endPoint.AcceptAsync(token);
-                _ = HandleLinuxCommandConnectionAsync(clientSocket, onCommand, token);
+                Console.Error.WriteLine($"[Linux Command Server Error] {ex.Message}");
+                try { await Task.Delay(1000, token); } catch (OperationCanceledException) { return; }
             }
-        }
-        catch (OperationCanceledException) { }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"[Linux Command Server Error] {ex.Message}");
-            await Task.Delay(1000, token);
-        }
-        finally
-        {
-            if (File.Exists(CommandSocketPath))
+            finally
             {
-                File.Delete(CommandSocketPath);
+                if (File.Exists(CommandSocketPath))
+                {
+                    File.Delete(CommandSocketPath);
+                }
             }
         }
     }

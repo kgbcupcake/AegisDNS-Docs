@@ -1,4 +1,4 @@
-This file is a merged representation of a subset of the codebase, containing specifically included files and files not matching ignore patterns, combined into a single document by Repomix.
+This file is a merged representation of a subset of the codebase, containing specifically included files, combined into a single document by Repomix.
 
 <file_summary>
 This section contains a summary of this file.
@@ -33,7 +33,6 @@ The content is organized as follows:
 - Some files may have been excluded based on .gitignore rules and Repomix's configuration
 - Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
 - Only files matching these patterns are included: src/AegisDNS.Installer/**/*.cs, src/AegisDNS.Installer/**/*.axaml, src/AegisDNS.Installer/**/*.axaml.cs
-- Files matching these patterns are excluded: obj/**, bin/**, *.user, *.suo, *.DotSettings, *.lock, node_modules/**
 - Files matching patterns in .gitignore are excluded
 - Files matching default ignore patterns are excluded
 - Files are sorted by Git change count (files with more changes are at the bottom)
@@ -1028,6 +1027,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 
 using AegisDNS.Core.Ai;
@@ -1066,12 +1066,15 @@ public class InstallService
         await Step(1, "Copy binaries", CopyBinariesAsync);
         await Step(2, "Compile eBPF protection", CompileEbpfAsync);
         await Step(3, "Install systemd service", InstallServiceAsync);
-        await Step(4, "Configure DNS upstream", ConfigureDnsAsync);
-        await Step(5, "Write AI config", WriteAiConfigAsync);
-        await Step(6, "Desktop integration", InstallDesktopAsync);
-        await Step(7, "Free port 53", DisableResolvedStubAsync);
-        await Step(8, "Start service", StartServiceAsync);
-        await Step(9, "Restore license", RestoreLicenseAsync);
+        await Step(4, "Load SELinux policy", LoadSeLinuxPolicyAsync);
+        await Step(5, "Configure DNS upstream", ConfigureDnsAsync);
+        await Step(6, "Write AI config", WriteAiConfigAsync);
+        await Step(7, "Write XDP config", WriteXdpConfigAsync);
+        await Step(8, "Desktop integration", InstallDesktopAsync);
+        await Step(9,  "Free port 53",          DisableResolvedStubAsync);
+        await Step(10, "Start service",          StartServiceAsync);
+        await Step(11, "Restore license",        RestoreLicenseAsync);
+        await Step(12, "Install CA certificate", InstallCaCertAsync);
     }
 
     private async Task Step(int index, string name, Func<Task> action)
@@ -1122,17 +1125,40 @@ public class InstallService
         await RunAsyncWithArgumentList("pkill", new[] { "-f", "AegisDNS.Service" }, ignoreErrors: true);
         await Task.Delay(500);
 
+        // AppDir is the Installer's own directory; binaries live in sibling folders
+        string publishRoot   = Path.GetDirectoryName(AppDir) ?? AppDir;
+        string serviceSrcDir = Path.Combine(publishRoot, "Service");
+        string uiSrcDir      = Path.Combine(publishRoot, "UI");
+
         // ── Copy UI binary ────────────────────────────────────────────────────
         // Canonical install path: /opt/AegisDNS/UI/AegisDNSUI  (AppRun expects this)
         string uiSubDir     = Path.Combine(InstallDir, "UI");
         Directory.CreateDirectory(uiSubDir);
         string uiBinaryDest = Path.Combine(uiSubDir, "AegisDNSUI");
 
-        // Priority 1: single self-contained binary alongside the installer
-        string uiBinarySrc  = Path.Combine(AppDir, "AegisDNSUI");
+        // Priority 1: single self-contained binary in the UI sibling folder
+        string uiBinarySrc  = Path.Combine(uiSrcDir, "AegisDNSUI");
         if (File.Exists(uiBinarySrc))
         {
             File.Copy(uiBinarySrc, uiBinaryDest, overwrite: true);
+
+            // Copy all sibling publish files belonging to the UI
+            foreach (var file in Directory.GetFiles(uiSrcDir, "*", SearchOption.TopDirectoryOnly))
+            {
+                string fileName = Path.GetFileName(file);
+                // Skip installer and service binary — they have their own destinations
+                if (fileName == "AegisDNS.Installer" || fileName == "AegisDNS.Service") continue;
+                string dest = Path.Combine(uiSubDir, fileName);
+                File.Copy(file, dest, overwrite: true);
+            }
+
+            // Copy kernel/ and runtimes/ subdirectories if present
+            foreach (var subDir in new[] { "kernel", "runtimes", "Security" })
+            {
+                string src = Path.Combine(uiSrcDir, subDir);
+                if (Directory.Exists(src))
+                    CopyDirectory(src, Path.Combine(uiSubDir, subDir));
+            }
         }
         else
         {
@@ -1166,12 +1192,30 @@ public class InstallService
         }
 
         // ── Copy Service binary ───────────────────────────────────────────────
-        // Priority 1: single self-contained binary alongside the installer
-        string svcBinarySrc  = Path.Combine(AppDir, "AegisDNS.Service");
+        // Priority 1: single self-contained binary in the Service sibling folder
+        string svcBinarySrc  = Path.Combine(serviceSrcDir, "AegisDNS.Service");
         string svcExe        = Path.Combine(ServiceDir, "AegisDNS.Service");
         if (File.Exists(svcBinarySrc))
         {
             File.Copy(svcBinarySrc, svcExe, overwrite: true);
+
+            // Copy all sibling publish files (.dll, .deps.json, .runtimeconfig.json, etc.)
+            foreach (var file in Directory.GetFiles(serviceSrcDir, "*", SearchOption.TopDirectoryOnly))
+            {
+                string fileName = Path.GetFileName(file);
+                // Skip installer itself and UI binary — they have their own destinations
+                if (fileName == "AegisDNS.Installer" || fileName == "AegisDNSUI") continue;
+                string dest = Path.Combine(ServiceDir, fileName);
+                File.Copy(file, dest, overwrite: true);
+            }
+
+            // Copy kernel/ and runtimes/ subdirectories if present
+            foreach (var subDir in new[] { "kernel", "runtimes", "Security" })
+            {
+                string src = Path.Combine(serviceSrcDir, subDir);
+                if (Directory.Exists(src))
+                    CopyDirectory(src, Path.Combine(ServiceDir, subDir));
+            }
         }
         else
         {
@@ -1339,6 +1383,9 @@ public class InstallService
 
     private async Task InstallServiceAsync()
     {
+        string realUser = GetRealUserName() ?? "nobody";
+        string iface = DetectPrimaryInterface();
+
         var unit = $"""
 [Unit]
 Description=AegisDNS AI-Powered DNS Interceptor Service
@@ -1357,15 +1404,15 @@ RestartSec=5
 StandardOutput=append:/var/log/aegisdns/service.log
 StandardError=append:/var/log/aegisdns/service.error.log
 User=root
-Group=only
-Environment=AEGIS_UI_USER=only
+Group={realUser}
+Environment=AEGIS_UI_USER={realUser}
 RuntimeDirectory=aegisdns
 RuntimeDirectoryMode=0750
 LimitNOFILE=65536
 LimitNPROC=4096
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_NET_RAW CAP_BPF
 AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_BPF
-ExecStopPost=/bin/sh -c 'resolvectl dns enp4s0 8.8.8.8 8.8.4.4 && resolvectl domain enp4s0 "~." && resolvectl flush-caches'
+ExecStopPost=/bin/sh -c 'resolvectl dns {iface} 8.8.8.8 8.8.4.4 && resolvectl domain {iface} "~." && resolvectl flush-caches'
 
 [Install]
 WantedBy=multi-user.target
@@ -1376,35 +1423,59 @@ WantedBy=multi-user.target
         // The UI's Activate/Deactivate button controls start/stop/enable/disable.
     }
 
-    // ── Step 4: Configure DNS upstream ───────────────────────────────────────
+    // ── Step 4: Load SELinux policy ───────────────────────────────────────────
+
+    private async Task LoadSeLinuxPolicyAsync()
+    {
+        var (getenforceExit, _, _) = await RunCapture("getenforce", Array.Empty<string>());
+        if (getenforceExit != 0) return;
+
+        string policyFile = Path.Combine(ConfigDir, "selinux", "aegisdns.pp");
+        if (!File.Exists(policyFile)) return;
+
+        await RunAsyncWithArgumentList("semodule", new[] { "-i", policyFile }, ignoreErrors: true);
+    }
+
+    // ── Step 5: Configure DNS upstream ───────────────────────────────────────
 
     private async Task ConfigureDnsAsync()
     {
-        string upstreamIp = _vm.SelectedUpstream switch
+        try
         {
-            "Google" => "8.8.8.8",
-            "Quad9" => "9.9.9.9",
-            "OpenDNS" => "208.67.222.222",
-            "Custom" => _vm.CustomPrimary,
-            _ => "1.1.1.1"   // Cloudflare default
-        };
+            string upstreamIp = _vm.SelectedUpstream switch
+            {
+                "Google" => "8.8.8.8",
+                "Quad9" => "9.9.9.9",
+                "OpenDNS" => "208.67.222.222",
+                "Custom" => _vm.CustomPrimary,
+                _ => "1.1.1.1"   // Cloudflare default
+            };
 
-        // Write AegisDNS upstream config only.
-        // System DNS is NOT touched here — it is switched to 127.0.0.1
-        // in StartServiceAsync() only after the service is confirmed healthy.
-        Directory.CreateDirectory(ConfigDir);
-        await File.WriteAllTextAsync(Path.Combine(ConfigDir, "upstream.conf"),
-            $"UPSTREAM_DNS={upstreamIp}\nDOH_ENABLED={(_vm.DohEnabled ? "1" : "0")}\n");
+            // Write AegisDNS upstream config only.
+            // System DNS is NOT touched here — it is switched to 127.0.0.1
+            // in StartServiceAsync() only after the service is confirmed healthy.
+            Directory.CreateDirectory(ConfigDir);
+            await File.WriteAllTextAsync(Path.Combine(ConfigDir, "upstream.conf"),
+                $"UPSTREAM_DNS={upstreamIp}\nDOH_ENABLED={(_vm.DohEnabled ? "1" : "0")}\n");
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                Directory.CreateDirectory(LogDir);
+                await File.AppendAllTextAsync(Path.Combine(LogDir, "installer-error.log"),
+                    $"[{DateTime.UtcNow:O}] ConfigureDnsAsync failed: {ex}\n");
+            }
+            catch { /* logging failure must not mask the real error */ }
+            throw;
+        }
     }
 
     // ── Step 5: Write AI config ───────────────────────────────────────────────
 
     private async Task WriteAiConfigAsync()
     {
-        string aiConfigDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".config", "AegisDNS");
-        Directory.CreateDirectory(aiConfigDir);
+        string aiConfigDir = "/var/lib/aegisdns";
         string aiConfigFile = Path.Combine(aiConfigDir, "Ai.config");
 
         if (!File.Exists(aiConfigFile))
@@ -1426,7 +1497,20 @@ WantedBy=multi-user.target
         }
     }
 
-    // ── Step 6: Desktop integration ───────────────────────────────────────────
+    // ── Step 6: Write XDP config ──────────────────────────────────────────────
+
+    private async Task WriteXdpConfigAsync()
+    {
+        string xdpConfigPath = Path.Combine("/var/lib/aegisdns", "xdp.config.json");
+        if (!File.Exists(xdpConfigPath))
+        {
+            var config = new { XdpMode = 2, XdpInterface = "auto" };
+            string json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(xdpConfigPath, json);
+        }
+    }
+
+    // ── Step 7: Desktop integration ───────────────────────────────────────────
 
     private async Task InstallDesktopAsync()
     {
@@ -1458,7 +1542,7 @@ StartupNotify=true
     private async Task StartServiceAsync()
     {
         // Detect the primary interface for resolvectl
-        string iface = "enp4s0"; // safe fallback
+        string iface = DetectPrimaryInterface();
 
         await RunAsyncWithArgumentList("systemctl", new[] { "start", "aegisdns" });
 
@@ -1519,6 +1603,54 @@ StartupNotify=true
         string rootKey = Path.Combine(rootConfigDir, "license.key");
         await File.WriteAllTextAsync(rootKey, token);
         Chmod(rootKey, "600");
+    }
+
+    // ── Step 12: Install CA certificate ──────────────────────────────────────
+
+    private async Task InstallCaCertAsync()
+    {
+        string caCert = "/etc/pki/ca-trust/source/anchors/aegisdns-ca.crt";
+        if (!File.Exists(caCert)) return; // CA not generated yet — skip
+
+        // System-wide trust (Fedora/RHEL)
+        await RunAsyncWithArgumentList("update-ca-trust", Array.Empty<string>(), ignoreErrors: true);
+
+        // Determine the real user's home directory
+        string? realUser = GetRealUserName();
+        if (realUser == null) return;
+        string userHome = GetHomeForUser(realUser);
+
+        // Copy cert to /tmp with open permissions so certutil can read it as any user
+        string tmpCert = "/tmp/aegisdns-ca.crt";
+        File.Copy(caCert, tmpCert, overwrite: true);
+        Chmod(tmpCert, "644");
+
+        // Helper: import cert into an NSS database directory
+        async Task ImportToNss(string nssDb)
+        {
+            if (!Directory.Exists(nssDb)) return;
+            await RunAsyncWithArgumentList("certutil",
+                new[] { "-A", "-n", "AegisDNS Local CA", "-t", "CT,,",
+                        "-i", tmpCert, "-d", $"sql:{nssDb}" },
+                ignoreErrors: true);
+        }
+
+        // Firefox: scan all profiles under ~/.mozilla/firefox/
+        string ffProfilesRoot = Path.Combine(userHome, ".mozilla", "firefox");
+        if (Directory.Exists(ffProfilesRoot))
+        {
+            foreach (var profile in Directory.GetDirectories(ffProfilesRoot))
+                await ImportToNss(profile);
+        }
+
+        // Brave (Flatpak): fixed NSS store path
+        string braveNss = Path.Combine(userHome, ".var", "app",
+            "com.brave.Browser", ".pki", "nssdb");
+        await ImportToNss(braveNss);
+
+        // Brave (native deb/rpm install) and Chrome / Chromium share the same store
+        string sharedNss = Path.Combine(userHome, ".pki", "nssdb");
+        await ImportToNss(sharedNss);
     }
 
     // ── Step 7: Free port 53 ─────────────────────────────────────────────────
@@ -1618,6 +1750,22 @@ StartupNotify=true
         }
         catch { }
         return null;
+    }
+
+    private static string DetectPrimaryInterface()
+    {
+        try
+        {
+            var active = NetworkInterface
+                .GetAllNetworkInterfaces()
+                .FirstOrDefault(ni =>
+                    ni.OperationalStatus == OperationalStatus.Up &&
+                    ni.GetIPProperties().GatewayAddresses.Count > 0 &&
+                    ni.NetworkInterfaceType != NetworkInterfaceType.Loopback);
+            if (active != null) return active.Name;
+        }
+        catch { }
+        return "enp4s0"; // genuine last-resort fallback only
     }
 
     /// <summary>
@@ -2436,11 +2584,16 @@ public class InstallerViewModel : ReactiveObject
         InstallSteps.Add(new InstallStep { Name = "Copy binaries", Icon = "📦" });
         InstallSteps.Add(new InstallStep { Name = "Compile eBPF protection", Icon = "🔥" });
         InstallSteps.Add(new InstallStep { Name = "Install systemd service", Icon = "⚙️" });
+        InstallSteps.Add(new InstallStep { Name = "Load SELinux policy", Icon = "🔒" });
         InstallSteps.Add(new InstallStep { Name = "Configure DNS upstream", Icon = "🌐" });
         InstallSteps.Add(new InstallStep { Name = "Write AI config", Icon = "🤖" });
+        InstallSteps.Add(new InstallStep { Name = "Configure XDP mode", Icon = "⚡" });
         InstallSteps.Add(new InstallStep { Name = "Desktop integration", Icon = "🖥️" });
         InstallSteps.Add(new InstallStep { Name = "Free port 53", Icon = "🔓" });
+        InstallSteps.Add(new InstallStep { Name = "Install .NET runtime", Icon = "🟣" });
         InstallSteps.Add(new InstallStep { Name = "Start service", Icon = "🚀" });
+        InstallSteps.Add(new InstallStep { Name = "Restore license", Icon = "🔑" });
+        InstallSteps.Add(new InstallStep { Name = "Install CA certificate", Icon = "🔐" });
     }
 
     private async Task StartInstallAsync()

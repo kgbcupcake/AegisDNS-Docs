@@ -32,7 +32,7 @@ The content is organized as follows:
 <notes>
 - Some files may have been excluded based on .gitignore rules and Repomix's configuration
 - Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
-- Only files matching these patterns are included: src/AegisDNS.Service/**/*.cs
+- Only files matching these patterns are included: src/AegisDNS.Service/Src/**, src/AegisDNS.Core/Core/Engine.cs, src/AegisDNS.Core/Utilities/BootManager.cs, src/AegisDNS.Core/Utilities/TelemetryBlocker.cs
 - Files matching patterns in .gitignore are excluded
 - Files matching default ignore patterns are excluded
 - Files are sorted by Git change count (files with more changes are at the bottom)
@@ -42,9 +42,13 @@ The content is organized as follows:
 
 <directory_structure>
 src/
+  AegisDNS.Core/
+    Core/
+      Engine.cs
+    Utilities/
+      BootManager.cs
+      TelemetryBlocker.cs
   AegisDNS.Service/
-    Properties/
-      AssemblyInfo.cs
     Src/
       AiSentinelWorker.cs
       Program.cs
@@ -56,10 +60,147 @@ src/
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/AegisDNS.Service/Properties/AssemblyInfo.cs">
-using System.Runtime.Versioning;
+<file path="src/AegisDNS.Core/Utilities/BootManager.cs">
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
 
-[assembly: SupportedOSPlatform("linux")]
+namespace AegisDNS.Core;
+
+/// Manages AegisDNS auto-start on boot.
+/// Linux: writes/removes a systemd user service or XDG autostart entry.
+/// </summary>
+public static class BootManager
+{
+    private const string AppName = "aegisdns-ui";
+
+    // XDG autostart — works on all Linux DEs (GNOME, KDE, XFCE, etc.)
+    private static string XdgAutostartDir =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                     ".config", "autostart");
+
+    private static string XdgAutostartFile =>
+        Path.Combine(XdgAutostartDir, "aegisdns.desktop");
+
+    public static void SetStartup(bool enable)
+    {
+        SetStartupLinux(enable);
+    }
+
+    public static bool IsStartupEnabled()
+    {
+        return File.Exists(XdgAutostartFile);
+    }
+
+    private static void SetStartupLinux(bool enable)
+    {
+        try
+        {
+            if (enable)
+            {
+                Directory.CreateDirectory(XdgAutostartDir);
+                string exePath = Environment.ProcessPath ?? "/opt/AegisDNS/AegisDNSUI";
+                string desktop = $"""
+[Desktop Entry]
+Type=Application
+Name=AegisDNS
+Exec={exePath}{(ConfigManager.Settings.StartMinimized ? " --minimized" : "")}
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Comment=AegisDNS DNS Privacy Shield — auto-start
+""";
+                File.WriteAllText(XdgAutostartFile, desktop);
+            }
+            else
+            {
+                if (File.Exists(XdgAutostartFile))
+                    File.Delete(XdgAutostartFile);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[BootManager] Autostart error: {ex.Message}");
+        }
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Core/Utilities/TelemetryBlocker.cs">
+using System;
+using System.Diagnostics;
+
+namespace AegisDNS.Core.Utilities;
+
+/// <summary>
+/// Blocks telemetry at the DNS level by adding known telemetry domains to the blocklist.
+/// Works on all platforms via the existing BlocklistManager — no OS-specific code needed.
+/// </summary>
+public static class TelemetryBlocker
+{
+    // Well-known telemetry domains across common software vendors
+    private static readonly string[] TelemetryDomains =
+    [
+        // Microsoft
+        "telemetry.microsoft.com",
+        "vortex.data.microsoft.com",
+        "settings-win.data.microsoft.com",
+        "watson.telemetry.microsoft.com",
+        "oca.telemetry.microsoft.com",
+        "telecommand.telemetry.microsoft.com",
+        "sqm.telemetry.microsoft.com",
+        // Google
+        "clients4.google.com",
+        "update.googleapis.com",
+        "safebrowsing.googleapis.com",
+        // Apple
+        "metrics.icloud.com",
+        "xp.apple.com",
+        // Common analytics
+        "analytics.google.com",
+        "www.google-analytics.com",
+        "segment.io",
+        "api.segment.io",
+        "mixpanel.com",
+        "api.mixpanel.com",
+        "amplitude.com",
+        "api.amplitude.com",
+        "hotjar.com",
+        "static.hotjar.com",
+        // Advertising
+        "doubleclick.net",
+        "googlesyndication.com",
+        "googleadservices.com",
+        "facebook.com/tr",
+        "connect.facebook.net",
+    ];
+
+    public static void ApplyBlocking(bool enable)
+    {
+        if (!ConfigManager.Settings.TelemetryOptIn && enable)
+        {
+            Debug.WriteLine("[TelemetryBlocker] Skipped: user has not opted in.");
+            return;
+        }
+
+        try
+        {
+            foreach (var domain in TelemetryDomains)
+            {
+                if (enable)
+                    AiLearnedBlocklist.Add(domain);
+                else
+                    AiLearnedBlocklist.Remove(domain);
+            }
+            Debug.WriteLine(enable ? "[TelemetryBlocker] Domains blocked." : "[TelemetryBlocker] Domains unblocked.");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[TelemetryBlocker] Error: {ex.Message}");
+        }
+    }
+}
 </file>
 
 <file path="src/AegisDNS.Service/Src/AiSentinelWorker.cs">
@@ -1274,6 +1415,820 @@ public class Worker : BackgroundService
         if (_webDashboard != null)
             await _webDashboard.StopAsync().ConfigureAwait(false);
         await base.StopAsync(cancellationToken);
+    }
+}
+</file>
+
+<file path="src/AegisDNS.Core/Core/Engine.cs">
+using System.Collections.Concurrent;
+using System.Collections.Immutable;
+using System.Diagnostics;
+using System.Net;
+using System.Net.NetworkInformation; // For dynamic interface detection
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Channels;
+
+using AegisDNS.Core;
+using AegisDNS.Core.Dns;
+using AegisDNS.Core.Monitoring;
+using AegisDNS.Core.Platform;
+using AegisDNS.Core.ProcessTracking;
+using AegisDNS.Core.RouterMode;
+using AegisDNS.Core.Scheduling;
+using AegisDNS.Core.Utilities;
+using AegisDNS.Licensing; // Added for new LicenseManager
+
+using ARSoft.Tools.Net.Dns;
+
+using Microsoft.Extensions.Logging;
+
+namespace AegisDNS.Core;
+
+public class AegisEngine
+{
+    // --- PRIVATE MEMBERS ---
+    private readonly ILoggerFactory _loggerFactory;
+    private readonly ILogger<AegisEngine> _logger;
+    private readonly Channel<string> _aiQueue = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true });
+    public ChannelReader<string> AiQueueReader => _aiQueue.Reader;
+    private DnsServer? _server;
+    private DnsClient? _upstreamClient;
+    private ImmutableHashSet<string> _blocklist = ImmutableHashSet<string>.Empty.WithComparer(StringComparer.OrdinalIgnoreCase);
+    private List<string> _originalDns = new();
+    private bool _originalDnsWasDhcp = true;
+    private readonly ConcurrentDictionary<string, (DnsMessage Response, DateTime Expiry)> _cache = new();
+    private readonly ConcurrentDictionary<IPAddress, int> _requestCounts = new();
+    private readonly System.Timers.Timer _throttleTimer;
+    private readonly DoHClient _dohClient;
+    private readonly QueryHistoryBuffer _history = new(200);
+    private AiWatchdog? _aiWatchdog;
+    private readonly BlocklistManager _listManager = new();
+    private readonly DomainRoleManager _roleManager = new();
+    private readonly ISystemDnsManager _dnsManager;
+
+    // Phase 11 — Process rules, scheduling, DoT
+    private readonly ProcessRuleEngine _processRuleEngine = new();
+    private readonly ScheduleEngine _scheduleEngine = new();
+    private DotClient? _dotClient;
+
+    public AegisEngine(ILoggerFactory loggerFactory)
+    {
+        _loggerFactory = loggerFactory;
+        _logger = loggerFactory.CreateLogger<AegisEngine>();
+        _dohClient = new DoHClient(loggerFactory.CreateLogger<DoHClient>());
+        // Attach to exit events for safe DNS restoration
+        AppDomain.CurrentDomain.ProcessExit += (s, e) => Stop();
+        AppDomain.CurrentDomain.UnhandledException += (s, e) => Stop();
+
+        _dnsManager = new LinuxDnsManager(Broadcast);
+
+        // --- CRASH RECOVERY: Restore DNS from file snapshot if previous session crashed ---
+        var snapshot = DnsSnapshot.Load();
+        if (snapshot != null)
+        {
+            Broadcast("⚠️ Crash recovery: Restoring DNS from saved snapshot...");
+            _originalDns = snapshot.OriginalDns;
+            _originalDnsWasDhcp = snapshot.WasDhcp;
+            SetSystemDns(false); // Restore the original DNS
+            Broadcast("✅ DNS restored successfully from crash snapshot.");
+        }
+
+        // Throttling timer: Reset every 60 seconds
+        _throttleTimer = new System.Timers.Timer(60000);
+        _throttleTimer.Elapsed += (s, e) => _requestCounts.Clear();
+        _throttleTimer.AutoReset = true;
+        _throttleTimer.Start();
+
+        // Load Allowlist
+        AllowlistManager.Load();
+        AiLearnedBlocklist.Load();
+
+        // Load false positive reports — these are auto-added to the allowlist on load.
+        // SafeListingManager uses a static constructor so no explicit Load() call is needed.
+    }
+
+    // --- 1. NEW EVENT SYSTEM (For Dashboard & Log Window sync) ---
+    public event Action<string>? LogReceived;
+
+    // --- 2. COMPATIBILITY LOGGER (Restored to fix build errors) ---
+    // This allows older parts of the app to still function without crashing.
+    public Action<string>? Logger { get; set; }
+
+    public bool IsRunning { get; private set; }
+    private long _blockedCount;
+    public long BlockedCount => Interlocked.Read(ref _blockedCount);
+
+    /// <summary>
+    /// Fetches and updates the blocklist domains in background.
+    /// </summary>
+    public async Task UpdateBlocklistAsync()
+    {
+        try
+        {
+            Broadcast("⏳ Updating multi-source Hagezi blocklists...");
+            var domains = await _listManager.FetchAndParseAsync(msg => Task.Run(() => Broadcast(msg)));
+            LoadBlocklist(domains);
+            Broadcast("✅ Blocklist update complete.");
+        }
+        catch (Exception ex)
+        {
+            Broadcast($"❌ Blocklist Update Error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    ﻿	/// Loads the provided domains into the high-speed memory blocklist.
+    ﻿	/// </summary>
+    public void LoadBlocklist(IEnumerable<string> domains)
+    {
+        var builder = ImmutableHashSet.CreateBuilder<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var d in domains)
+        {
+            if (!string.IsNullOrWhiteSpace(d))
+            {
+                // Clean the domain so "example.com." becomes "example.com"
+                builder.Add(d.Trim().ToLower().TrimEnd('.'));
+            }
+        }
+
+        _blocklist = builder.ToImmutable();
+        Broadcast($"📚 Loaded {_blocklist.Count:N0} rules into memory.");
+    }
+
+    public IEnumerable<string> GetCurrentBlocklist()
+    {
+        return _blocklist;
+    }
+
+    /// <summary>
+    /// Atomically adds a new domain to the high-speed memory blocklist (used by AI feedback loop).
+    /// </summary>
+    public void AddToBlocklist(string domain)
+    {
+        if (string.IsNullOrWhiteSpace(domain)) return;
+        var cleanDomain = domain.Trim().ToLower().TrimEnd('.');
+        ImmutableInterlocked.Update(ref _blocklist, list => list.Add(cleanDomain));
+        Broadcast($"🤖 AI added dynamic rule to memory: {cleanDomain}");
+    }
+
+    /// <summary>
+    /// Starts the DNS server and modifies system settings.
+    /// </summary>
+    public void Start()
+    {
+        if (IsRunning) return;
+
+        // --- LICENSE ENFORCEMENT ---
+        if (LicenseManager.IsTrialExpired)
+        {
+            Broadcast("TRIAL_EXPIRED");
+            return;
+        }
+
+        try
+        {
+            // --- DYNAMIC UPSTREAM INIT ---
+            // Use TryParse with safe fallbacks for corrupted/missing settings
+            var upstreamIps = new List<IPAddress>();
+
+            if (!IPAddress.TryParse(DnsConfigManager.Settings.PrimaryDns, out var primaryDns))
+            {
+                primaryDns = IPAddress.Parse("8.8.8.8");
+                Broadcast("⚠️ WARNING: Primary DNS setting invalid or missing. Using fallback: 8.8.8.8");
+            }
+            upstreamIps.Add(primaryDns);
+
+            if (!IPAddress.TryParse(DnsConfigManager.Settings.SecondaryDns, out var secondaryDns))
+            {
+                secondaryDns = IPAddress.Parse("1.1.1.1");
+                Broadcast("⚠️ WARNING: Secondary DNS setting invalid or missing. Using fallback: 1.1.1.1");
+            }
+            upstreamIps.Add(secondaryDns);
+
+            _upstreamClient = new DnsClient(upstreamIps, 2000);
+
+            // 1. Create the Transports — support router mode or loopback
+            IPAddress bindAddress = IPAddress.Loopback;
+            int bindPort = 53;
+
+            if (RouterConfigManager.Settings.EnableRouterMode)
+            {
+                if (!IPAddress.TryParse(RouterConfigManager.Settings.RouterModeBindAddress, out var routerAddr))
+                    routerAddr = IPAddress.Any;
+                bindAddress = routerAddr;
+                bindPort = RouterConfigManager.Settings.RouterModePort;
+            }
+
+            try
+            {
+                var udpTransport = new UdpServerTransport(bindAddress, bindPort);
+                var tcpTransport = new TcpServerTransport(bindAddress, bindPort);
+                _server = new DnsServer(udpTransport, tcpTransport);
+            }
+            catch (Exception bindEx)
+            {
+                Broadcast($"⚠️ Router mode bind failed ({bindAddress}:{bindPort}): {bindEx.Message}. Reverting to loopback.");
+                RouterConfigManager.Settings.EnableRouterMode = false;
+                ConfigManager.Save();
+                var udpTransport = new UdpServerTransport(IPAddress.Loopback, 53);
+                var tcpTransport = new TcpServerTransport(IPAddress.Loopback, 53);
+                _server = new DnsServer(udpTransport, tcpTransport);
+            }
+
+            // Phase 11 — Init DoT client if configured
+            _dotClient = DnsConfigManager.Settings.UpstreamMode == UpstreamMode.DoT
+                ? new DotClient(DnsConfigManager.Settings.DoTUpstream)
+                : null;
+
+            // 2. Wire event handler
+            _server.QueryReceived += OnQueryReceived;
+
+            // 3. Start Listening
+            _server.Start();
+
+            // 3.5 Start AI Watchdog Background Worker
+            _aiWatchdog = new AiWatchdog(this, _roleManager, _loggerFactory.CreateLogger<AiWatchdog>());
+            _aiWatchdog.Start();
+
+            IsRunning = true;
+
+            // 4. Change system DNS settings using our dynamic detector
+            SetSystemDns(true);
+
+            Broadcast("Success: Shield is online");
+        }
+        catch (Exception ex)
+        {
+            // Walk the exception chain to find a SocketException — the transport
+            // layer may wrap it in an outer exception.
+            System.Net.Sockets.SocketException? sockEx = null;
+            for (Exception? e = ex; e != null; e = e.InnerException)
+            {
+                if (e is System.Net.Sockets.SocketException s)
+                {
+                    sockEx = s;
+                    break;
+                }
+            }
+
+            if (sockEx?.SocketErrorCode == System.Net.Sockets.SocketError.AddressAlreadyInUse)
+                Broadcast("❌ Port 53 is in use. Run: sudo systemctl stop systemd-resolved");
+            else
+            {
+                Broadcast($"❌ STARTUP ERROR: {ex.Message}");
+                Broadcast("👉 Hint: Run as Administrator or check if Port 53 is free.");
+            }
+            Stop();
+        }
+    }
+
+    /// <summary>
+    ﻿				/// Stops the server and restores the user's original internet settings.
+    ﻿				/// </summary>
+    public void Stop()
+    {
+        try
+        {
+            if (_server != null)
+            {
+                _server.Stop();
+                _server = null;
+            }
+            if (_aiWatchdog != null)
+            {
+                _aiWatchdog.Stop();
+                _aiWatchdog = null;
+            }
+
+            IsRunning = false;
+
+            // Restore Internet
+            SetSystemDns(false);
+
+            Broadcast("Shield deactivated: Service offline");
+        }
+        catch (Exception ex)
+        {
+            Broadcast($"⚠️ Error stopping: {ex.Message}");
+        }
+    }
+    /// <summary>
+    ﻿	/// The main interceptor. Decides whether to kill a request or let it through. (Strictly Synchronous)
+    ﻿	/// </summary>
+    private Task OnQueryReceived(object sender, QueryReceivedEventArgs e)
+    {
+        try
+        {
+            if (e.Query is not DnsMessage query) return Task.CompletedTask;
+
+            MetricsManager.IncrementTotal();
+
+            // --- CHECK 0: Throttling ---
+            var remoteIp = e.RemoteEndpoint.Address;
+            _requestCounts.AddOrUpdate(remoteIp, 1, (_, count) => count + 1);
+            if (_requestCounts.TryGetValue(remoteIp, out int currentCount) && currentCount > 100)
+            {
+                // Drop the request by not setting e.Response
+                return Task.CompletedTask;
+            }
+
+            var question = query.Questions.FirstOrDefault();
+            if (question == null) return Task.CompletedTask;
+
+            // Clean the domain name (remove trailing dot for matching)
+            var originalName = question.Name.ToString();
+            var cleanName = originalName.TrimEnd('.');
+
+            // Mirror to AI Diagnostics
+            _aiQueue.Writer.TryWrite(cleanName);
+
+            // Router mode: track non-loopback devices (fire-and-forget)
+            bool isNonLoopback = RouterConfigManager.Settings.EnableRouterMode && !IPAddress.IsLoopback(remoteIp);
+
+            // --- CHECK 0.3: Per-Process DNS Rules (Pro+) ---
+            bool processAllowAll = false;
+            if (RouterConfigManager.Settings.EnablePerProcessBlocking &&
+                LicenseManager.CurrentTier >= LicenseManager.LicenseTier.Pro)
+            {
+                try
+                {
+                    var remoteEndpoint = e.RemoteEndpoint as IPEndPoint;
+                    int sourcePort = remoteEndpoint?.Port ?? 0;
+                    if (sourcePort > 0)
+                    {
+                        string? processName = ResolveProcessNameFromPort(sourcePort);
+                        if (processName != null)
+                        {
+                            bool? decision = _processRuleEngine.ShouldBlock(processName, cleanName);
+                            if (decision == true)
+                            {
+                                Interlocked.Increment(ref _blockedCount);
+                                MetricsManager.IncrementBlocked();
+                                Broadcast($"🔒 PROCESS-BLOCK: {cleanName} [{processName}]");
+                                var resp = query.CreateResponseInstance();
+                                resp.ReturnCode = ReturnCode.Refused;
+                                e.Response = resp;
+                                _history.Add(cleanName, true, "Per-Process Rule");
+                                if (isNonLoopback)
+                                    ThreadPool.QueueUserWorkItem(_ => ConnectedDeviceTracker.Instance.RecordQuery(remoteIp, true));
+                                return Task.CompletedTask;
+                            }
+                            processAllowAll = decision == false;
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // --- CHECK 0.4: Scheduled / Time-Based Blocking (Pro+) ---
+            if (!processAllowAll &&
+                RouterConfigManager.Settings.EnableScheduledBlocking &&
+                LicenseManager.CurrentTier >= LicenseManager.LicenseTier.Pro &&
+                _scheduleEngine.IsScheduledBlock(cleanName))
+            {
+                Interlocked.Increment(ref _blockedCount);
+                MetricsManager.IncrementBlocked();
+                Broadcast($"🕐 SCHEDULE-BLOCK: {cleanName}");
+                var resp = query.CreateResponseInstance();
+                resp.ReturnCode = ReturnCode.Refused;
+                e.Response = resp;
+                _history.Add(cleanName, true, "Schedule");
+                if (isNonLoopback)
+                    ThreadPool.QueueUserWorkItem(_ => ConnectedDeviceTracker.Instance.RecordQuery(remoteIp, true));
+                return Task.CompletedTask;
+            }
+
+            // --- CHECK 0.5: User Allowlist (bypass blocklist entirely) ---
+            if (!processAllowAll && !AllowlistManager.Contains(cleanName))
+            {
+                // --- CHECK 0.7: AI-Learned Blocklist ---
+                if (AiLearnedBlocklist.Contains(cleanName))
+                {
+                    Interlocked.Increment(ref _blockedCount);
+                    MetricsManager.IncrementBlocked();
+                    Broadcast($"🤖 AI-LEARNED BLOCK: {cleanName}");
+                    var response = query.CreateResponseInstance();
+                    response.ReturnCode = ReturnCode.Refused;
+                    e.Response = response;
+                    var aiRole = _roleManager.GetRoleSnapshot(cleanName);
+                    TimeSpan? ageLog = aiRole != null ? DateTime.UtcNow - aiRole.FirstSeenAt : null;
+                    _history.Add(cleanName, true, "AI-Learned List", ageLog);
+                    if (isNonLoopback)
+                        ThreadPool.QueueUserWorkItem(_ => ConnectedDeviceTracker.Instance.RecordQuery(remoteIp, true));
+                    return Task.CompletedTask;
+                }
+
+                // --- CHECK 1: Is it in the static blocklist or dynamically identified by role? ---
+                bool isBlocked = _blocklist.Contains(cleanName);
+
+                if (!isBlocked)
+                {
+                    var role = _roleManager.GetRoleSnapshot(cleanName);
+                    if (role != null && role.ShouldBlock())
+                    {
+                        isBlocked = true;
+                        // Optionally alert the user that it was dynamically blocked by behavior
+                        Broadcast($"🤖 BEHAVIOR BLOCK [{SessionManager.CurrentPhase}]: {cleanName} (Monetization: {role.MonetizationScore:F2}, Func: {role.FunctionalScore:F2})");
+                    }
+                }
+
+                if (isBlocked)
+                {
+                    Interlocked.Increment(ref _blockedCount); // Atomic increment for thread safety
+                    MetricsManager.IncrementBlocked();
+                    TopDomainsTracker.RecordBlocked(cleanName);
+                    Broadcast($"🚫 BLOCKED: {cleanName}");
+
+                    // Create a "Refused" response to kill the ad/tracker
+                    var response = query.CreateResponseInstance();
+                    response.ReturnCode = ReturnCode.Refused;
+                    e.Response = response;
+                    var snapshot = _roleManager.GetRoleSnapshot(cleanName);
+                    TimeSpan? snapshotAge = snapshot != null ? DateTime.UtcNow - snapshot.FirstSeenAt : null;
+                    string reason = (snapshot != null && snapshot.ShouldBlock()) ? "Behavioral Threshold" : "Static Feed";
+                    _history.Add(cleanName, true, reason, snapshotAge);
+                    if (isNonLoopback)
+                        ThreadPool.QueueUserWorkItem(_ => ConnectedDeviceTracker.Instance.RecordQuery(remoteIp, true));
+                    return Task.CompletedTask;
+                }
+
+                // --- CHECK 1.5: Streaming Ad Blocklist (Pro+, Phase 17) ---
+                if (StreamingBlockEngine.IsStreamingAdDomain(cleanName))
+                {
+                    Interlocked.Increment(ref _blockedCount);
+                    MetricsManager.IncrementBlocked();
+                    MetricsManager.IncrementStreamingAdsBlocked();
+                    TopDomainsTracker.RecordBlocked(cleanName);
+                    Broadcast($"📺 [StreamingAd] BLOCKED: {cleanName}");
+                    var streamResp = query.CreateResponseInstance();
+                    streamResp.ReturnCode = ReturnCode.Refused;
+                    e.Response = streamResp;
+                    _history.Add(cleanName, true, "Streaming Ad Blocklist");
+                    if (isNonLoopback)
+                        ThreadPool.QueueUserWorkItem(_ => ConnectedDeviceTracker.Instance.RecordQuery(remoteIp, true));
+                    return Task.CompletedTask;
+                }
+            } // End Blocklist check
+            else
+            {
+                // Domain is allowlisted — log and fall through to upstream resolution
+                if (ConfigManager.Settings.LogDnsRequests)
+                    Broadcast($"✅ ALLOWED: {cleanName}");
+                TopDomainsTracker.RecordAllowed(cleanName);
+                if (isNonLoopback)
+                    ThreadPool.QueueUserWorkItem(_ => ConnectedDeviceTracker.Instance.RecordQuery(remoteIp, false));
+            }
+
+            // --- CHECK 2: Cache lookup ---
+            string cacheKey = $"{cleanName}_{question.RecordType}";
+            if (_cache.TryGetValue(cacheKey, out var cached) && cached.Expiry > DateTime.UtcNow)
+            {
+                MetricsManager.IncrementCacheHit();
+                if (ConfigManager.Settings.LogDnsRequests)
+                {
+                    Broadcast($"⚡ CACHE HIT: {cleanName}");
+                }
+
+                var cachedResponse = query.CreateResponseInstance();
+                cachedResponse.ReturnCode = cached.Response.ReturnCode;
+                cachedResponse.AnswerRecords.AddRange(cached.Response.AnswerRecords);
+                cachedResponse.AuthorityRecords.AddRange(cached.Response.AuthorityRecords);
+                cachedResponse.AdditionalRecords.AddRange(cached.Response.AdditionalRecords);
+
+                e.Response = cachedResponse;
+                return Task.CompletedTask;
+            }
+
+            // --- CHECK 3: If safe, forward to user's chosen DNS ---
+            try
+            {
+                if (ConfigManager.Settings.LogDnsRequests)
+                {
+                    Broadcast($"🔎 Request: {cleanName}");
+                }
+
+                DnsMessage? upstreamResponse = null;
+
+                // --- DoT Resolution (Phase 11) ---
+                if (_dotClient != null && DnsConfigManager.Settings.UpstreamMode == UpstreamMode.DoT)
+                {
+                    upstreamResponse = _dotClient.Resolve(question.Name, question.RecordType, question.RecordClass);
+                    // If DoT fails, fall through to standard UDP below
+                }
+
+                // --- Standard Resolution (UDP fallback or primary) ---
+                if (upstreamResponse == null && _upstreamClient != null)
+                {
+                    // ARSoft Resolve method sync version
+                    upstreamResponse = _upstreamClient.Resolve(question.Name, question.RecordType, question.RecordClass);
+                }
+
+                if (upstreamResponse != null)
+                {
+                    // Bug 49 fix: rewrite transaction ID to match the original client query.
+                    // ARSoft's upstream DnsClient uses its own internal TX ID for multiplexing.
+                    // Assigning upstreamResponse directly sends the wrong ID back to the client.
+                    // CreateResponseInstance() stamps the correct client TX ID onto the response.
+                    var clientResponse = query.CreateResponseInstance();
+                    clientResponse.ReturnCode = upstreamResponse.ReturnCode;
+                    clientResponse.IsRecursionAllowed = true;
+                    clientResponse.AnswerRecords.AddRange(upstreamResponse.AnswerRecords);
+                    clientResponse.AuthorityRecords.AddRange(upstreamResponse.AuthorityRecords);
+                    clientResponse.AdditionalRecords.AddRange(upstreamResponse.AdditionalRecords);
+                    e.Response = clientResponse;
+                    Broadcast($"[Bug49] client ID={query.TransactionID} upstream ID={upstreamResponse.TransactionID} proxied ID={clientResponse.TransactionID}");
+                    var snapshot = _roleManager.GetRoleSnapshot(cleanName);
+                    TimeSpan? snapshotAge = snapshot != null ? DateTime.UtcNow - snapshot.FirstSeenAt : null;
+                    _history.Add(cleanName, false, "", snapshotAge);
+                    TopDomainsTracker.RecordAllowed(cleanName);
+                    if (isNonLoopback)
+                        ThreadPool.QueueUserWorkItem(_ => ConnectedDeviceTracker.Instance.RecordQuery(remoteIp, false));
+
+                    // Save to cache if it has answers
+                    if (upstreamResponse.AnswerRecords.Count > 0)
+                    {
+                        int minTtl = upstreamResponse.AnswerRecords.Min(r => r.TimeToLive);
+                        if (minTtl > 0)
+                        {
+                            // Lazily prune if too large
+                            if (_cache.Count > ConfigManager.Settings.CacheSize * 10)
+                            {
+                                _cache.Clear(); // Simple truncation if we hit the limit
+                            }
+
+                            _cache[cacheKey] = (upstreamResponse, DateTime.UtcNow.AddSeconds(minTtl));
+                        }
+                    }
+                }
+                else
+                {
+                    MetricsManager.IncrementUpstreamFailure();
+                }
+            }
+            catch (Exception ex)
+            {
+                MetricsManager.IncrementUpstreamFailure();
+                Broadcast($"⚠️ Upstream Error: {cleanName} - {ex.Message}");
+
+                // FAIL-SAFE: If DoH fails, force a standard UDP fallback right here
+                try
+                {
+                    if (_upstreamClient != null)
+                    {
+                        var fallbackResponse = _upstreamClient.Resolve(question.Name, question.RecordType, question.RecordClass);
+                        if (fallbackResponse != null)
+                        {
+                            var clientFallback = query.CreateResponseInstance();
+                            clientFallback.ReturnCode = fallbackResponse.ReturnCode;
+                            clientFallback.IsRecursionAllowed = true;
+                            clientFallback.AnswerRecords.AddRange(fallbackResponse.AnswerRecords);
+                            clientFallback.AuthorityRecords.AddRange(fallbackResponse.AuthorityRecords);
+                            clientFallback.AdditionalRecords.AddRange(fallbackResponse.AdditionalRecords);
+                            e.Response = clientFallback;
+                        }
+                    }
+                }
+                catch
+                {
+                    // If even the fallback fails, return a "Server Failure" so the browser 
+                    // knows the request is dead instead of just waiting forever.
+                    var errResponse = query.CreateResponseInstance();
+                    errResponse.ReturnCode = ReturnCode.ServerFailure;
+                    e.Response = errResponse;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Top-level catch to prevent DNS server crashes
+            Broadcast($"❌ CRITICAL DNS ERROR: {ex.Message}");
+            try
+            {
+                // Try to return a server failure response
+                if (e.Query is DnsMessage query)
+                {
+                    var errResponse = query.CreateResponseInstance();
+                    errResponse.ReturnCode = ReturnCode.ServerFailure;
+                    e.Response = errResponse;
+                }
+            }
+            catch
+            {
+                // If we can't even create an error response, just log and continue
+            }
+        }
+        return Task.CompletedTask;
+    }
+
+    // --- BROADCAST BRIDGE ---
+    // This sends messages to ALL listeners: Dashboard, LogWindow, and Logger property
+    public void Broadcast(string msg)
+    {
+        LogReceived?.Invoke(msg); // New Event System
+        Logger?.Invoke(msg);      // Old Property System (Compatibility)
+    }
+
+    public void TriggerLog(string msg)
+    {
+        Broadcast(msg);
+    }
+
+    /// <summary>
+    /// Restores the original DNS settings from the persistent snapshot.
+    /// </summary>
+    public static void RestoreSystemDns()
+    {
+        var engine = new AegisEngine(Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
+        var snapshot = DnsSnapshot.Load();
+        if (snapshot != null)
+        {
+            engine._originalDns = snapshot.OriginalDns;
+            engine._originalDnsWasDhcp = snapshot.WasDhcp;
+            engine.SetSystemDns(false);
+        }
+    }
+
+    /// <summary>
+    /// Uses 'resolvectl' (Linux) to tell the OS to use our app as the DNS server.
+    ﻿		/// </summary>
+    private void SetSystemDns(bool enable)
+    {
+        try
+        {
+            string interfaceName = DetectActiveInterface();
+            if (string.IsNullOrEmpty(interfaceName)) return;
+
+            if (enable)
+            {
+                _dnsManager.SetDns("127.0.0.1");
+            }
+            else
+            {
+                _dnsManager.RestoreDns();
+            }
+        }
+        catch (Exception ex)
+        {
+            Broadcast($"⚠️ DNS Switch Error: {ex.Message}");
+        }
+    }
+
+    private void BackupOriginalDns(string interfaceName)
+    {
+        var active = NetworkInterface.GetAllNetworkInterfaces()
+            .FirstOrDefault(ni => ni.Name == interfaceName);
+
+        if (active != null)
+        {
+            var dns = active.GetIPProperties().DnsAddresses;
+            _originalDns = dns.Select(a => a.ToString()).ToList();
+
+            // We assume it's DHCP if it was set to DHCP originally.
+            // .NET doesn't directly tell us if DNS is DHCP-managed easily,
+            // so we'll treat empty or 127.0.0.1 as a reason to fall back to DHCP on stop.
+            _originalDnsWasDhcp = _originalDns.Count == 0;
+        }
+    }
+
+    private string DetectActiveInterface()
+    {
+        var active = NetworkInterface.GetAllNetworkInterfaces()
+            .FirstOrDefault(ni => ni.OperationalStatus == OperationalStatus.Up &&
+                                  ni.GetIPProperties().GatewayAddresses.Count > 0 &&
+                                  ni.NetworkInterfaceType != NetworkInterfaceType.Loopback);
+
+        return active?.Name ?? string.Empty;
+    }
+
+    private void RunCommand(string command, string[] args)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo(command)
+            {
+                CreateNoWindow = true,
+                UseShellExecute = false
+            };
+            foreach (var arg in args)
+                psi.ArgumentList.Add(arg);
+            Process.Start(psi)?.WaitForExit(5000);
+        }
+        catch (Exception ex)
+        {
+            Broadcast($"⚠️ Command failed: {command} — {ex.Message}");
+        }
+    }
+
+
+
+    public IReadOnlyCollection<QueryHistoryEntry> GetHistory()
+    {
+        return _history.GetSnapshot();
+    }
+
+    // --- Phase 11: /proc-based process identity resolution ---
+
+    /// <summary>
+    /// Resolves the process name for a given UDP source port using /proc/net/udp.
+    /// Returns null on failure or timeout (> 1ms). Never throws.
+    /// </summary>
+    private static string? ResolveProcessNameFromPort(int sourcePort)
+    {
+        if (sourcePort <= 0) return null;
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            string hexPort = sourcePort.ToString("X4", System.Globalization.CultureInfo.InvariantCulture);
+
+            long inode = FindInodeForPort("/proc/net/udp", hexPort, sw);
+            if (inode < 0 && sw.ElapsedMilliseconds < 1)
+                inode = FindInodeForPort("/proc/net/udp6", hexPort, sw);
+            if (inode < 0) return null;
+
+            return FindProcessNameForInode(inode, sw);
+        }
+        catch { }
+        return null;
+    }
+
+    private static long FindInodeForPort(string path, string hexPort, Stopwatch sw)
+    {
+        if (!System.IO.File.Exists(path)) return -1;
+        try
+        {
+            foreach (var line in System.IO.File.ReadLines(path))
+            {
+                if (sw.ElapsedMilliseconds >= 1) return -1;
+                // Format: sl  local_address:port rem_address ...  inode
+                var parts = line.TrimStart().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 10) continue;
+                var addrParts = parts[1].Split(':');
+                if (addrParts.Length == 2 &&
+                    string.Equals(addrParts[1], hexPort, StringComparison.OrdinalIgnoreCase) &&
+                    long.TryParse(parts[9], out long inode))
+                {
+                    return inode;
+                }
+            }
+        }
+        catch { }
+        return -1;
+    }
+
+    private static string? FindProcessNameForInode(long inode, Stopwatch sw)
+    {
+        string socketTarget = $"socket:[{inode}]";
+        try
+        {
+            foreach (var pidDir in System.IO.Directory.EnumerateDirectories("/proc"))
+            {
+                if (sw.ElapsedMilliseconds >= 1) return null;
+                if (!int.TryParse(System.IO.Path.GetFileName(pidDir), out _)) continue;
+
+                string fdDir = System.IO.Path.Combine(pidDir, "fd");
+                if (!System.IO.Directory.Exists(fdDir)) continue;
+
+                try
+                {
+                    foreach (var fdEntry in System.IO.Directory.EnumerateFiles(fdDir))
+                    {
+                        if (sw.ElapsedMilliseconds >= 1) return null;
+                        string? linkTarget = new System.IO.FileInfo(fdEntry).LinkTarget;
+                        if (linkTarget != null && linkTarget.StartsWith('/'))
+                        {
+                            string resolved = System.IO.Path.GetFullPath(linkTarget);
+                            if (!IsProcSymlinkAllowed(resolved))
+                            {
+                                System.Diagnostics.Debug.WriteLine($"[Engine] Rejected /proc symlink outside allowed prefixes: {resolved}");
+                                continue;
+                            }
+                        }
+                        if (string.Equals(linkTarget, socketTarget, StringComparison.Ordinal))
+                        {
+                            string commPath = System.IO.Path.Combine(pidDir, "comm");
+                            return System.IO.File.Exists(commPath)
+                                ? System.IO.File.ReadAllText(commPath).Trim()
+                                : null;
+                        }
+                    }
+                }
+                catch { }
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    private static readonly string[] _allowedProcSymlinkPrefixes =
+        ["/proc/", "/usr/", "/bin/", "/sbin/", "/opt/", "/lib/"];
+
+    private static bool IsProcSymlinkAllowed(string resolvedPath)
+    {
+        foreach (var prefix in _allowedProcSymlinkPrefixes)
+            if (resolvedPath.StartsWith(prefix, StringComparison.Ordinal))
+                return true;
+        return false;
     }
 }
 </file>
